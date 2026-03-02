@@ -38,6 +38,7 @@ model User {
   resumeSource      ResumeSource?
   resumeGenerations ResumeGeneration[]
 
+  @@index([lastActiveAt])
   @@map("users")
 }
 

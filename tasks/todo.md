@@ -200,6 +200,39 @@ src/
 
 ---
 
+## PRD 6: Admin Panel — COMPLETE
+
+- [x] Phase 1: Admin handler + query functions + schema index (`adminHandler()`, `getPlatformStats()`, `getDauOverTime()`, `getGenerationStats()`, `getUserList()`, `@@index([lastActiveAt])`)
+- [x] Phase 2: API routes (GET stats, GET stats/generations, GET users, GET users/[id], PUT users/[id]/limits — 5 route files)
+- [x] Phase 3: Frontend components (OverviewTab, UsersTab, UserLimitEditor, GenerationsTab, admin page with 3 tabs)
+- [x] Phase 4: Tests + verification (13 admin unit tests, 6 stats route tests, 9 limits route tests — 28 new tests)
+
+### Key Files Created
+- `src/lib/admin.ts` — Rewritten: `adminHandler()` wrapper (auth+admin check), `isAdminEmail()`, `getPlatformStats()`, `getDauOverTime()` (30-day zero-filled), `getGenerationStats()` (daily volume/cost + top 10 users), `getUserList()` (paginated, searchable, sortable with cost aggregates)
+- `src/lib/validations/admin.ts` — `updateLimitsSchema` (Zod: applicationCap/resumeGenerationCap with range + at-least-one refinement)
+- `src/app/api/admin/stats/route.ts` — GET: platform overview stats + DAU over time
+- `src/app/api/admin/stats/generations/route.ts` — GET: generation volume, cost trends, top users by cost
+- `src/app/api/admin/users/route.ts` — GET: paginated user list with search, sort, aggregate stats
+- `src/app/api/admin/users/[id]/route.ts` — GET: single user detail with cost aggregates
+- `src/app/api/admin/users/[id]/limits/route.ts` — PUT: update user caps (blocks self-edit)
+- `src/components/admin/overview-tab.tsx` — Summary cards (Users, Apps, Resumes, Est. Spend) + DAU bar chart + MAU
+- `src/components/admin/users-tab.tsx` — Searchable/sortable/paginated user table with expandable limit editing
+- `src/components/admin/user-limit-editor.tsx` — Inline cap editing form (Save/Cancel)
+- `src/components/admin/generations-tab.tsx` — Generation summary cards + daily bar chart + cumulative cost line + top 10 users table
+- `src/app/(authenticated)/admin/page.tsx` — Admin page with 3 tabs (Overview, Users, Generations), role check redirect, URL tab state
+- `prisma/schema.prisma` — Added `@@index([lastActiveAt])` to User model
+
+### Verification
+- `npx tsc --noEmit` — 0 errors
+- `npm run test` — 195/195 tests pass (28 new for PRD 6)
+- `npx prisma generate` — success (from earlier phases)
+
+### Deferred / Known Issues
+- **No DB migration run yet.** Schema index added, `prisma generate` succeeds.
+- **E2E test scaffold deferred.** Requires running server + seeded DB + admin session.
+- **DAU limitation:** `lastActiveAt` only stores most recent activity, so DAU is approximate (counts users whose last activity was on that day, not all users who were active).
+
+---
+
 ## Remaining PRDs
-- PRD 6: Admin Panel
 - PRD 7: Polish, Donations & Deployment
