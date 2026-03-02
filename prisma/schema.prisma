@@ -1,0 +1,294 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(USER)
+
+  // Usage caps
+  applicationCap                  Int       @default(200)
+  resumeGenerationCap             Int       @default(5)
+  resumeGenerationsUsedThisMonth  Int       @default(0)
+  capResetAt                      DateTime?
+
+  // Activity
+  lastActiveAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  accounts        Account[]
+  sessions        Session[]
+  kanbanColumns   KanbanColumn[]
+  jobApplications JobApplication[]
+  resumeSource    ResumeSource?
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Kanban Models ──────────────────────────────────────────────────────────
+
+model KanbanColumn {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String
+  order      Int
+  color      String   @default("#6366f1")
+  columnType String?  // "CLOSED", "OFFER", or null
+  createdAt  DateTime @default(now())
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications JobApplication[]
+
+  @@unique([userId, name])
+  @@map("kanban_columns")
+}
+
+model JobApplication {
+  id                  String    @id @default(cuid())
+  userId              String
+  serialNumber        Int
+  columnId            String
+  columnOrder         Int       @default(0)
+  company             String
+  role                String
+  hiringManager       String?
+  hiringOrg           String?
+  postingNumber       String?
+  postingUrl          String?
+  locationType        String?   // "Remote", "Hybrid", "On-site"
+  primaryLocation     String?
+  additionalLocations String?
+  salaryMin           Int?
+  salaryMax           Int?
+  bonusTargetPct      Float?
+  variableComp        Int?
+  referrals           String?   @db.Text
+  datePosted          DateTime?
+  dateApplied         DateTime?
+  rejectionDate       DateTime?
+  jobDescription      String?   @db.Text
+  closedReason        String?   // "rejected" or "ghosted"
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  column     KanbanColumn         @relation(fields: [columnId], references: [id], onDelete: Restrict)
+  interviews InterviewRecord[]
+  statusLogs ApplicationStatusLog[]
+  notes      ApplicationNote[]
+
+  @@unique([userId, serialNumber])
+  @@index([columnId])
+  @@index([userId])
+  @@map("job_applications")
+}
+
+model InterviewRecord {
+  id               String    @id @default(cuid())
+  jobApplicationId String
+  type             String    // Screening, Hiring Manager, Panel, Technical, Final, Other
+  format           String    // Virtual, On-site, Phone
+  people           String?   @db.Text
+  date             DateTime?
+  notes            String?   @db.Text
+  sortOrder        Int       @default(0)
+  createdAt        DateTime  @default(now())
+
+  jobApplication JobApplication @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
+
+  @@index([jobApplicationId])
+  @@map("interview_records")
+}
+
+model ApplicationStatusLog {
+  id               String   @id @default(cuid())
+  jobApplicationId String
+  fromColumnId     String?
+  toColumnId       String
+  movedAt          DateTime @default(now())
+
+  jobApplication JobApplication @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
+
+  @@index([jobApplicationId, movedAt])
+  @@map("application_status_logs")
+}
+
+model ApplicationNote {
+  id               String   @id @default(cuid())
+  jobApplicationId String
+  content          String   @db.Text
+  createdAt        DateTime @default(now())
+
+  jobApplication JobApplication @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
+
+  @@index([jobApplicationId])
+  @@map("application_notes")
+}
+
+// ─── Resume Source Models ────────────────────────────────────────────────────
+
+model ResumeSource {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact      ResumeContact?
+  education    ResumeEducation[]
+  experiences  ResumeWorkExperience[]
+  skills       ResumeSkill[]
+  publications ResumePublication[]
+
+  @@map("resume_sources")
+}
+
+model ResumeContact {
+  id             String  @id @default(cuid())
+  resumeSourceId String  @unique
+  fullName       String  @default("")
+  email          String  @default("")
+  phone          String?
+  location       String?
+  linkedIn       String?
+  website        String?
+  summary        String? @db.Text
+
+  resumeSource ResumeSource @relation(fields: [resumeSourceId], references: [id], onDelete: Cascade)
+
+  @@map("resume_contacts")
+}
+
+model ResumeEducation {
+  id             String  @id @default(cuid())
+  resumeSourceId String
+  institution    String  @default("")
+  degree         String  @default("")
+  fieldOfStudy   String?
+  startDate      String?
+  endDate        String?
+  gpa            String?
+  honors         String?
+  notes          String? @db.Text
+  sortOrder      Int     @default(0)
+
+  resumeSource ResumeSource @relation(fields: [resumeSourceId], references: [id], onDelete: Cascade)
+
+  @@index([resumeSourceId])
+  @@map("resume_education")
+}
+
+model ResumeWorkExperience {
+  id             String  @id @default(cuid())
+  resumeSourceId String
+  company        String  @default("")
+  title          String  @default("")
+  location       String?
+  startDate      String?
+  endDate        String?
+  description    String? @db.Text
+  sortOrder      Int     @default(0)
+
+  resumeSource ResumeSource          @relation(fields: [resumeSourceId], references: [id], onDelete: Cascade)
+  subsections  ResumeWorkSubsection[]
+
+  @@index([resumeSourceId])
+  @@map("resume_work_experiences")
+}
+
+model ResumeWorkSubsection {
+  id               String   @id @default(cuid())
+  workExperienceId String
+  label            String
+  bullets          String[]
+  sortOrder        Int      @default(0)
+
+  workExperience ResumeWorkExperience @relation(fields: [workExperienceId], references: [id], onDelete: Cascade)
+
+  @@index([workExperienceId])
+  @@map("resume_work_subsections")
+}
+
+model ResumeSkill {
+  id             String   @id @default(cuid())
+  resumeSourceId String
+  category       String
+  items          String[]
+  sortOrder      Int      @default(0)
+
+  resumeSource ResumeSource @relation(fields: [resumeSourceId], references: [id], onDelete: Cascade)
+
+  @@index([resumeSourceId])
+  @@map("resume_skills")
+}
+
+model ResumePublication {
+  id             String  @id @default(cuid())
+  resumeSourceId String
+  title          String
+  publisher      String?
+  date           String?
+  url            String?
+  description    String? @db.Text
+  sortOrder      Int     @default(0)
+
+  resumeSource ResumeSource @relation(fields: [resumeSourceId], references: [id], onDelete: Cascade)
+
+  @@index([resumeSourceId])
+  @@map("resume_publications")
+}
