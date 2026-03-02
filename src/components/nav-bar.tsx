@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { Menu, LogOut } from "lucide-react";
+import { UsageBadge } from "@/components/resume/usage-badge";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -71,6 +72,11 @@ export function NavBar() {
 
         {/* User menu + mobile hamburger */}
         <div className="flex items-center gap-2">
+          {/* Usage badge (desktop) */}
+          <div className="hidden md:block">
+            <UsageBadge />
+          </div>
+
           {/* User dropdown (desktop) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -121,6 +127,11 @@ export function NavBar() {
                     </Button>
                   </Link>
                 ))}
+                <Separator className="my-2" />
+                <div className="flex items-center gap-2 px-4 py-1">
+                  <span className="text-sm text-muted-foreground">Resumes:</span>
+                  <UsageBadge />
+                </div>
                 <Separator className="my-2" />
                 <Button
                   variant="ghost"

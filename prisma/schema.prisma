@@ -31,11 +31,12 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  accounts        Account[]
-  sessions        Session[]
-  kanbanColumns   KanbanColumn[]
-  jobApplications JobApplication[]
-  resumeSource    ResumeSource?
+  accounts          Account[]
+  sessions          Session[]
+  kanbanColumns     KanbanColumn[]
+  jobApplications   JobApplication[]
+  resumeSource      ResumeSource?
+  resumeGenerations ResumeGeneration[]
 
   @@map("users")
 }
@@ -128,9 +129,10 @@ model JobApplication {
 
   user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   column     KanbanColumn         @relation(fields: [columnId], references: [id], onDelete: Restrict)
-  interviews InterviewRecord[]
-  statusLogs ApplicationStatusLog[]
-  notes      ApplicationNote[]
+  interviews          InterviewRecord[]
+  statusLogs          ApplicationStatusLog[]
+  notes               ApplicationNote[]
+  resumeGenerations   ResumeGeneration[]
 
   @@unique([userId, serialNumber])
   @@index([columnId])
@@ -291,4 +293,27 @@ model ResumePublication {
 
   @@index([resumeSourceId])
   @@map("resume_publications")
+}
+
+// ─── Resume Generation Models ─────────────────────────────────────────────────
+
+model ResumeGeneration {
+  id               String   @id @default(cuid())
+  userId           String
+  jobApplicationId String
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  estimatedCost    Float    @default(0)
+  markdownOutput   String   @db.Text
+  modelId          String
+  createdAt        DateTime @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobApplication JobApplication @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([jobApplicationId])
+  @@index([createdAt])
+  @@map("resume_generations")
 }

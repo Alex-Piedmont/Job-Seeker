@@ -132,8 +132,45 @@ src/
 
 ---
 
+## PRD 4: Resume Generation — COMPLETE
+
+- [x] Phase 0: Dependencies & schemas (`@anthropic-ai/sdk`, `docx`, ResumeGeneration model, Zod schema, `prisma generate`)
+- [x] Phase 1: Cap logic (`resume-cap.ts` — reserveGeneration, rollbackGeneration, getUserUsage + 12 unit tests)
+- [x] Phase 2: Claude API integration (`anthropic.ts` — SDK client, generateResume, estimateCost; `resume-prompt.ts` — impact-first prompt builder + 9 unit tests)
+- [x] Phase 3: DOCX generator (`docx-generator.ts` — markdownToDocx, sanitizeFilename, navy/blue Calibri styling + 7 unit tests)
+- [x] Phase 4: API routes (POST generate, GET download, GET usage, GET history — 4 route files)
+- [x] Phase 5: Frontend components (generate-button, resume-editor, download-button, generation-history, usage-badge — 5 components)
+- [x] Phase 6: Wired into existing UI (detail drawer resume section replaces placeholder, nav bar usage badge)
+- [x] Phase 7: Integration tests (generate: 8 tests, download: 4 tests, usage: 3 tests, history: 3 tests)
+- [x] Phase 8: Verification (`tsc --noEmit` 0 errors, 156/156 tests pass, `prisma generate` success)
+
+### Key Files Created
+- `src/lib/resume-cap.ts` — Atomic cap management (reserve/rollback/usage)
+- `src/lib/anthropic.ts` — Anthropic SDK client singleton, cost estimation
+- `src/lib/resume-prompt.ts` — Impact-first resume tailoring prompt
+- `src/lib/docx-generator.ts` — Markdown → .docx conversion (Calibri, navy/blue)
+- `src/lib/validations/resume.ts` — generateResumeSchema (Zod)
+- `src/app/api/resume/generate/route.ts` — POST: validate → compile → cap check → Claude → save
+- `src/app/api/resume/[id]/download/route.ts` — GET: ownership check → markdownToDocx → .docx download
+- `src/app/api/resume/usage/route.ts` — GET: usage stats for badge
+- `src/app/api/resume/history/[appId]/route.ts` — GET: generation history
+- `src/components/resume/` — 5 components (generate-button, resume-editor, download-button, generation-history, usage-badge)
+- `prisma/schema.prisma` — ResumeGeneration model + User/JobApplication relations
+
+### Verification
+- `npx tsc --noEmit` — 0 errors
+- `npm run test` — 156/156 tests pass (38 new for PRD 4)
+- `npx prisma generate` — success
+
+### Deferred / Known Issues
+- **No DB migration run yet.** ResumeGeneration model added to schema, `prisma generate` succeeds.
+- **E2E test scaffold deferred.** Requires running server + DB + `ANTHROPIC_API_KEY` env var.
+- **`ANTHROPIC_API_KEY` required.** Must be set in env for Claude API calls.
+- **Optional env vars:** `CLAUDE_MODEL` (default: claude-sonnet-4-6), `CLAUDE_INPUT_COST_PER_M` (default: 3.0), `CLAUDE_OUTPUT_COST_PER_M` (default: 15.0)
+
+---
+
 ## Remaining PRDs
-- PRD 4: Resume Generation (requires PRD 2 + 3)
 - PRD 5: Analytics Dashboard
 - PRD 6: Admin Panel
 - PRD 7: Polish, Donations & Deployment

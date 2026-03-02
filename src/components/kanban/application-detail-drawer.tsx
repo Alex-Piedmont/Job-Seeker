@@ -3,6 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { ChevronDown, Copy, Trash2 } from "lucide-react";
+import { GenerateButton } from "@/components/resume/generate-button";
+import { ResumeEditor } from "@/components/resume/resume-editor";
+import { DownloadButton } from "@/components/resume/download-button";
+import { GenerationHistory } from "@/components/resume/generation-history";
 import {
   Sheet,
   SheetContent,
@@ -130,6 +134,25 @@ export function ApplicationDetailDrawer({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUpdates = useRef<Record<string, unknown>>({});
 
+  // Resume generation state
+  const [hasResumeSource, setHasResumeSource] = useState(false);
+  const [capReached, setCapReached] = useState(false);
+  const [usageRefreshKey, setUsageRefreshKey] = useState(0);
+  const [currentGeneration, setCurrentGeneration] = useState<{
+    id: string;
+    markdownOutput: string;
+    originalMarkdown: string;
+  } | null>(null);
+  const [editedMarkdown, setEditedMarkdown] = useState("");
+  const [generations, setGenerations] = useState<Array<{
+    id: string;
+    markdownOutput: string;
+    promptTokens: number;
+    completionTokens: number;
+    estimatedCost: number;
+    createdAt: string;
+  }>>([]);
+
   const fetchApp = useCallback(async () => {
     try {
       const res = await fetch(`/api/kanban/applications/${applicationId}`);
@@ -146,6 +169,56 @@ export function ApplicationDetailDrawer({
   useEffect(() => {
     fetchApp();
   }, [fetchApp]);
+
+  // Check if resume source exists
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/resume-source/compile");
+        if (res.ok) {
+          const data = await res.json();
+          setHasResumeSource(!!data.markdown?.trim());
+        }
+      } catch { /* non-critical */ }
+    })();
+  }, []);
+
+  // Fetch usage to check cap
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/resume/usage");
+        if (res.ok) {
+          const data = await res.json();
+          setCapReached(!data.isAdmin && data.used >= data.cap);
+        }
+      } catch { /* non-critical */ }
+    })();
+  }, [usageRefreshKey]);
+
+  // Fetch generation history
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/resume/history/${applicationId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setGenerations(data);
+        // Auto-display most recent if no current generation
+        if (data.length > 0 && !currentGeneration) {
+          setCurrentGeneration({
+            id: data[0].id,
+            markdownOutput: data[0].markdownOutput,
+            originalMarkdown: data[0].markdownOutput,
+          });
+          setEditedMarkdown(data[0].markdownOutput);
+        }
+      }
+    } catch { /* non-critical */ }
+  }, [applicationId, currentGeneration]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   const flushUpdates = useCallback(async () => {
     const updates = { ...pendingUpdates.current };
@@ -616,11 +689,63 @@ export function ApplicationDetailDrawer({
 
               <Separator />
 
+              {/* Resume Generation */}
+              <CollapsibleSection title="Resume" defaultOpen={!!currentGeneration}>
+                <div className="space-y-3">
+                  <GenerateButton
+                    jobApplicationId={app.id}
+                    hasResumeSource={hasResumeSource}
+                    hasJobDescription={!!app.jobDescription?.trim()}
+                    capReached={capReached}
+                    onGenerated={(result) => {
+                      setCurrentGeneration({
+                        id: result.id,
+                        markdownOutput: result.markdownOutput,
+                        originalMarkdown: result.markdownOutput,
+                      });
+                      setEditedMarkdown(result.markdownOutput);
+                      setUsageRefreshKey((k) => k + 1);
+                      // Refresh history
+                      fetchHistory();
+                    }}
+                    onUsageChanged={() => setUsageRefreshKey((k) => k + 1)}
+                  />
+
+                  {currentGeneration && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <DownloadButton
+                          generationId={currentGeneration.id}
+                          editedMarkdown={editedMarkdown}
+                          originalMarkdown={currentGeneration.originalMarkdown}
+                        />
+                      </div>
+                      <ResumeEditor
+                        originalMarkdown={currentGeneration.originalMarkdown}
+                        editedMarkdown={editedMarkdown}
+                        onEdit={setEditedMarkdown}
+                      />
+                    </>
+                  )}
+
+                  <GenerationHistory
+                    generations={generations}
+                    onSelect={(gen) => {
+                      setCurrentGeneration({
+                        id: gen.id,
+                        markdownOutput: gen.markdownOutput,
+                        originalMarkdown: gen.markdownOutput,
+                      });
+                      setEditedMarkdown(gen.markdownOutput);
+                    }}
+                  />
+                </div>
+              </CollapsibleSection>
+
+              <Separator />
+
               {/* Actions */}
               <div className="space-y-2 pb-4">
-                <Button variant="outline" disabled className="w-full">
-                  Generate Resume (Coming Soon)
-                </Button>
                 <Button
                   variant="outline"
                   className="w-full"
