@@ -170,7 +170,36 @@ src/
 
 ---
 
+## PRD 5: Analytics Dashboard — COMPLETE
+
+- [x] Phase 0: Install recharts
+- [x] Phase 1: Analytics query functions library (`src/lib/analytics.ts` — 6 query functions: summary, funnel, weekly, time stats, conversion rates, closure breakdown, resume usage)
+- [x] Phase 2: API route (`GET /api/analytics` with `Promise.allSettled` for graceful partial failure) + unit tests (13 tests) + integration tests (3 tests)
+- [x] Phase 3: Analytics page + summary cards + empty state
+- [x] Phase 4: Pipeline funnel chart (recharts horizontal BarChart with column colors)
+- [x] Phase 5: Weekly applications line chart (12-week zero-filled, recharts LineChart)
+- [x] Phase 6: Time stats + conversion rates + closure breakdown (stacked bar with ghosted/rejected split)
+- [x] Phase 7: Resume usage card (progress bar with color-coded thresholds)
+- [x] Phase 8: Verification (`tsc --noEmit` 0 errors, 172/172 tests pass)
+
+### Key Files Created
+- `src/lib/analytics.ts` — 6 query functions with full type exports (AnalyticsResponse, FunnelEntry, etc.)
+- `src/app/api/analytics/route.ts` — Single endpoint with parallel query execution and per-section null fallback
+- `src/app/(authenticated)/analytics/page.tsx` — Client Component with fetch, refresh, skeleton loading, empty state
+- `src/components/analytics/` — 7 components (summary-cards, pipeline-funnel, weekly-chart, time-stats, resume-usage-card, closure-breakdown, empty-state)
+
+### Verification
+- `npx tsc --noEmit` — 0 errors
+- `npm run test` — 172/172 tests pass (16 new for PRD 5)
+- No new Prisma models — uses existing data only
+
+### Deferred / Known Issues
+- **E2E test scaffold deferred.** Requires running server + seeded DB.
+- **PERCENTILE_CONT:** Median calculation done in JS (not raw SQL) for Prisma compatibility — correct for up to 200 apps.
+- **No date range filtering.** Dashboard shows all-time data with 12-week weekly chart window.
+
+---
+
 ## Remaining PRDs
-- PRD 5: Analytics Dashboard
 - PRD 6: Admin Panel
 - PRD 7: Polish, Donations & Deployment
