@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // Shared patterns
-const dateRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
+const dateRegex = /^(\d{4}-(0[1-9]|1[0-2])|\d{4})$/;
 const urlRegex = /^https?:\/\//;
 
 const trimmedString = (max: number) => z.string().trim().max(max);
@@ -19,7 +19,7 @@ const optionalDate = () =>
   z
     .string()
     .trim()
-    .regex(dateRegex, "Must be YYYY-MM format")
+    .regex(dateRegex, "Must be YYYY-MM or YYYY format")
     .nullable()
     .optional();
 
