@@ -166,10 +166,22 @@ function ExperienceCard({
     );
   };
 
-  const title =
-    fields.title && fields.company
-      ? `${fields.title} — ${fields.company}`
-      : fields.title || fields.company || "New Experience";
+  const displayTitle = fields.title || "New Experience";
+
+  const formatYear = (date: string | null | undefined) => {
+    if (!date) return null;
+    const match = date.match(/(\d{4})/);
+    return match ? match[1] : null;
+  };
+
+  const startYear = formatYear(fields.startDate);
+  const endYear = formatYear(fields.endDate);
+  const timeframe =
+    startYear && endYear
+      ? `${startYear} – ${endYear}`
+      : startYear
+        ? `${startYear} – Present`
+        : null;
 
   return (
     <Draggable draggableId={entry.id} index={index}>
@@ -182,14 +194,30 @@ function ExperienceCard({
               </div>
               <button
                 onClick={onToggle}
-                className="flex flex-1 items-center gap-2 text-left text-sm font-medium"
+                className="flex flex-1 items-start gap-2 text-left"
               >
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-                {title}
+                <span className="mt-0.5">
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold leading-tight">
+                    {displayTitle}
+                  </span>
+                  {fields.company && (
+                    <span className="text-xs text-muted-foreground">
+                      {fields.company}
+                    </span>
+                  )}
+                  {timeframe && (
+                    <span className="text-xs text-muted-foreground">
+                      {timeframe}
+                    </span>
+                  )}
+                </div>
               </button>
               <SaveIndicator status={status} />
               <Button
