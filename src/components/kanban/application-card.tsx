@@ -78,7 +78,7 @@ export function ApplicationCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold text-sm truncate">
+            <span className="font-semibold text-sm break-words">
               {application.company}
             </span>
             <div className="flex items-center gap-1">
@@ -101,7 +101,7 @@ export function ApplicationCard({
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground truncate">
+          <p className="text-sm text-muted-foreground break-words">
             {application.role}
           </p>
 
