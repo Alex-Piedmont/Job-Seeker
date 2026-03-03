@@ -4,9 +4,10 @@ import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { SaveIndicator } from "./save-indicator";
-import { Trash2, Plus, X, GripVertical } from "lucide-react";
+import { Trash2, Plus, X, GripVertical, ChevronRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ export function SubsectionForm({
 }: SubsectionFormProps) {
   const [label, setLabel] = useState(subsection.label);
   const [bullets, setBullets] = useState(subsection.bullets);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const saveSubsection = useCallback(
@@ -62,6 +64,11 @@ export function SubsectionForm({
 
   const handleBlur = () => trigger({ label, bullets });
 
+  const autoResizeTextarea = (el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
   const addBullet = () => {
     const updated = [...bullets, ""];
     setBullets(updated);
@@ -86,6 +93,18 @@ export function SubsectionForm({
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
         )}
+        <button
+          type="button"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex items-center justify-center h-8 w-8 shrink-0"
+          aria-label={isCollapsed ? "Expand subsection" : "Collapse subsection"}
+        >
+          <ChevronRight
+            className={`h-4 w-4 text-muted-foreground transition-transform ${
+              !isCollapsed ? "rotate-90" : ""
+            }`}
+          />
+        </button>
         <div className="flex-1">
           <Label className="sr-only">Subsection Label</Label>
           <Input
@@ -96,6 +115,11 @@ export function SubsectionForm({
             className="font-medium"
           />
         </div>
+        {isCollapsed && bullets.length > 0 && (
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            {bullets.length} {bullets.length === 1 ? "bullet" : "bullets"}
+          </span>
+        )}
         <SaveIndicator status={status} />
         <Button
           variant="ghost"
@@ -107,36 +131,48 @@ export function SubsectionForm({
         </Button>
       </div>
 
-      {bullets.map((bullet, index) => (
-        <div key={index} className="flex items-center gap-2 pl-6">
-          <span className="text-muted-foreground">•</span>
-          <Input
-            value={bullet}
-            onChange={(e) => updateBullet(index, e.target.value)}
-            onBlur={handleBlur}
-            placeholder="Bullet point..."
-            className="flex-1"
-          />
+      {!isCollapsed && (
+        <>
+          {bullets.map((bullet, index) => (
+            <div key={index} className="flex items-start gap-2 pl-6">
+              <span className="text-muted-foreground mt-2">•</span>
+              <Textarea
+                value={bullet}
+                onChange={(e) => {
+                  updateBullet(index, e.target.value);
+                  autoResizeTextarea(e.target);
+                }}
+                onBlur={handleBlur}
+                onFocus={(e) => autoResizeTextarea(e.target)}
+                ref={(el) => {
+                  if (el) autoResizeTextarea(el);
+                }}
+                placeholder="Bullet point..."
+                className="flex-1 resize-none overflow-hidden min-h-[36px]"
+                rows={1}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => removeBullet(index)}
+                className="h-8 w-8 shrink-0"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+
           <Button
             variant="ghost"
-            size="icon"
-            onClick={() => removeBullet(index)}
-            className="h-8 w-8"
+            size="sm"
+            onClick={addBullet}
+            className="ml-6"
           >
-            <X className="h-3.5 w-3.5" />
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            Add Bullet
           </Button>
-        </div>
-      ))}
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={addBullet}
-        className="ml-6"
-      >
-        <Plus className="mr-1 h-3.5 w-3.5" />
-        Add Bullet
-      </Button>
+        </>
+      )}
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
