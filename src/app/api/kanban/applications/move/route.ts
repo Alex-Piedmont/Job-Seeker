@@ -50,10 +50,12 @@ export async function PUT(request: Request) {
       updateData.dateApplied = new Date();
     }
 
-    // Handle closed column moves
+    // Handle closed column moves — default rejection date to today if not provided
     if (isMovingColumns && targetColumn.columnType === "CLOSED") {
-      if (rejectionDate) {
-        updateData.rejectionDate = new Date(rejectionDate);
+      if (!application.rejectionDate) {
+        updateData.rejectionDate = rejectionDate
+          ? new Date(rejectionDate)
+          : new Date();
       }
       if (closedReason) {
         updateData.closedReason = closedReason;
