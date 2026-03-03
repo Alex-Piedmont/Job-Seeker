@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { ColumnHeader } from "./column-header";
 import { ApplicationCard, type ApplicationCardData } from "./application-card";
 
@@ -16,6 +17,8 @@ interface KanbanColumnProps {
   column: ColumnData;
   onCardClick: (applicationId: string) => void;
   onSettingsClick: (columnId: string) => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   columnDragHandleProps?: any;
   droppableProvided?: {
@@ -31,14 +34,40 @@ export function KanbanColumn({
   column,
   onCardClick,
   onSettingsClick,
+  collapsed,
+  onToggleCollapse,
   columnDragHandleProps,
   droppableProvided,
   renderCard,
 }: KanbanColumnProps) {
+  if (collapsed) {
+    return (
+      <div
+        className="flex flex-col items-center bg-muted/40 rounded-xl border border-border/50 shadow-sm w-12 max-h-full cursor-pointer snap-start shrink-0 py-3 gap-2 hover:bg-muted/60 transition-colors"
+        onClick={onToggleCollapse}
+        {...columnDragHandleProps}
+      >
+        <div
+          className="h-3 w-3 rounded-full shrink-0"
+          style={{ backgroundColor: column.color }}
+        />
+        <Badge variant="secondary" className="text-xs px-1.5">
+          {column.applications.length}
+        </Badge>
+        <span
+          className="text-xs font-semibold text-muted-foreground whitespace-nowrap"
+          style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
+        >
+          {column.name}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        "flex flex-col bg-muted/40 rounded-xl border border-border/50 shadow-sm min-w-[280px] w-[280px] max-h-full",
+        "flex flex-col bg-muted/40 rounded-xl border border-border/50 shadow-sm min-w-[320px] w-[320px] max-h-full",
         "snap-start shrink-0"
       )}
     >
@@ -47,13 +76,15 @@ export function KanbanColumn({
         color={column.color}
         applicationCount={column.applications.length}
         onSettingsClick={() => onSettingsClick(column.id)}
+        collapsed={collapsed}
+        onToggleCollapse={onToggleCollapse}
         dragHandleProps={columnDragHandleProps}
       />
 
       <div
         ref={droppableProvided?.innerRef}
         {...droppableProvided?.droppableProps}
-        className="flex-1 overflow-y-auto px-2 pb-2 space-y-2 min-h-[80px]"
+        className="flex-1 overflow-y-auto px-2 pb-2 space-y-3 min-h-[80px]"
       >
         {column.applications.map((app, index) =>
           renderCard ? (

@@ -61,7 +61,7 @@ export function ApplicationCard({
   return (
     <div
       className={cn(
-        "group relative rounded-lg border bg-card p-3 shadow-sm cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200",
+        "group relative rounded-lg border bg-card p-4 shadow-sm cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200",
         staleness === "muted" && "opacity-60",
         staleness === "warning" && "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
       )}
@@ -78,7 +78,7 @@ export function ApplicationCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold text-sm break-words">
+            <span className="font-semibold text-base break-words">
               {application.company}
             </span>
             <div className="flex items-center gap-1">
@@ -105,7 +105,13 @@ export function ApplicationCard({
             {application.role}
           </p>
 
-          <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+          {application.hiringManager && (
+            <p className="text-xs text-muted-foreground/70 mt-0.5">
+              HM: {application.hiringManager}
+            </p>
+          )}
+
+          <div className="flex items-center gap-2 mt-1.5 text-sm text-muted-foreground">
             {application.locationType && (
               <span>{application.locationType}</span>
             )}
