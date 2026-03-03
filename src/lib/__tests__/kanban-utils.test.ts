@@ -11,39 +11,56 @@ import {
 } from "../kanban-utils";
 
 describe("computeOTE", () => {
-  it("computes full OTE with all components", () => {
+  it("computes full OTE using midpoint: (75k+125k)/2=100k + 25% bonus=25k + 25k variable = 150k", () => {
     expect(
-      computeOTE({ salaryMax: 150000, bonusTargetPct: 15, variableComp: 50000 })
+      computeOTE({ salaryMin: 75000, salaryMax: 125000, bonusTargetPct: 25, variableComp: 25000 })
+    ).toBe(150000);
+  });
+
+  it("computes OTE with all components using midpoint", () => {
+    // midpoint = (120k+180k)/2 = 150k, bonus = 150k*15% = 22.5k, variable = 50k → 222.5k
+    expect(
+      computeOTE({ salaryMin: 120000, salaryMax: 180000, bonusTargetPct: 15, variableComp: 50000 })
     ).toBe(222500);
   });
 
-  it("returns salaryMax when bonus and variable are null", () => {
+  it("returns midpoint when bonus and variable are null", () => {
+    // midpoint = (150k+250k)/2 = 200k
     expect(
-      computeOTE({ salaryMax: 200000, bonusTargetPct: null, variableComp: null })
+      computeOTE({ salaryMin: 150000, salaryMax: 250000, bonusTargetPct: null, variableComp: null })
     ).toBe(200000);
+  });
+
+  it("returns null when salaryMin is null", () => {
+    expect(
+      computeOTE({ salaryMin: null, salaryMax: 200000, bonusTargetPct: 15, variableComp: 50000 })
+    ).toBeNull();
   });
 
   it("returns null when salaryMax is null", () => {
     expect(
-      computeOTE({ salaryMax: null, bonusTargetPct: 15, variableComp: 50000 })
+      computeOTE({ salaryMin: 100000, salaryMax: null, bonusTargetPct: 15, variableComp: 50000 })
     ).toBeNull();
   });
 
   it("handles zero bonus and variable", () => {
+    // midpoint = (80k+120k)/2 = 100k
     expect(
-      computeOTE({ salaryMax: 100000, bonusTargetPct: 0, variableComp: 0 })
+      computeOTE({ salaryMin: 80000, salaryMax: 120000, bonusTargetPct: 0, variableComp: 0 })
     ).toBe(100000);
   });
 
   it("handles bonus without variable comp", () => {
+    // midpoint = (160k+240k)/2 = 200k, bonus = 200k*20% = 40k → 240k
     expect(
-      computeOTE({ salaryMax: 200000, bonusTargetPct: 20, variableComp: null })
+      computeOTE({ salaryMin: 160000, salaryMax: 240000, bonusTargetPct: 20, variableComp: null })
     ).toBe(240000);
   });
 
   it("handles variable comp without bonus", () => {
+    // midpoint = (100k+200k)/2 = 150k, variable = 30k → 180k
     expect(
-      computeOTE({ salaryMax: 150000, bonusTargetPct: null, variableComp: 30000 })
+      computeOTE({ salaryMin: 100000, salaryMax: 200000, bonusTargetPct: null, variableComp: 30000 })
     ).toBe(180000);
   });
 });
@@ -79,7 +96,17 @@ describe("getCompensationDisplay", () => {
     expect(result).toContain("OTE");
   });
 
-  it("shows salary range when no OTE computable and both min/max present", () => {
+  it("shows salary range when no OTE computable (missing salaryMin)", () => {
+    const result = getCompensationDisplay({
+      salaryMin: null,
+      salaryMax: 220000,
+      bonusTargetPct: null,
+      variableComp: null,
+    });
+    expect(result).toBe("up to $220k");
+  });
+
+  it("shows salary min+ when only min present", () => {
     const result = getCompensationDisplay({
       salaryMin: 180000,
       salaryMax: null,

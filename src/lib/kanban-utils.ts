@@ -1,14 +1,16 @@
 // ─── OTE Computation ────────────────────────────────────────────────────────
 
 export function computeOTE(app: {
+  salaryMin: number | null;
   salaryMax: number | null;
   bonusTargetPct: number | null;
   variableComp: number | null;
 }): number | null {
-  if (app.salaryMax == null) return null;
-  const bonus = app.bonusTargetPct ? app.salaryMax * (app.bonusTargetPct / 100) : 0;
+  if (app.salaryMin == null || app.salaryMax == null) return null;
+  const midpoint = (app.salaryMin + app.salaryMax) / 2;
+  const bonus = app.bonusTargetPct ? midpoint * (app.bonusTargetPct / 100) : 0;
   const variable = app.variableComp ?? 0;
-  return app.salaryMax + bonus + variable;
+  return midpoint + bonus + variable;
 }
 
 // ─── Currency Formatting ────────────────────────────────────────────────────

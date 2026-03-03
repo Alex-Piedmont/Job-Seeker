@@ -43,7 +43,6 @@ export function CreateApplicationModal({
   const [columnId, setColumnId] = useState(columns[0]?.id ?? "");
   const [locationType, setLocationType] = useState<string>("");
   const [primaryLocation, setPrimaryLocation] = useState("");
-  const [postingUrl, setPostingUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,7 +58,6 @@ export function CreateApplicationModal({
       };
       if (locationType) body.locationType = locationType;
       if (primaryLocation.trim()) body.primaryLocation = primaryLocation.trim();
-      if (postingUrl.trim()) body.postingUrl = postingUrl.trim();
 
       const res = await fetch("/api/kanban/applications", {
         method: "POST",
@@ -81,7 +79,6 @@ export function CreateApplicationModal({
       setRole("");
       setLocationType("");
       setPrimaryLocation("");
-      setPostingUrl("");
       onCreated();
     } catch {
       toast.error("Failed to create application");
@@ -122,19 +119,14 @@ export function CreateApplicationModal({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="column">Column</Label>
-            <Select value={columnId} onValueChange={setColumnId}>
-              <SelectTrigger id="column">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {columns.map((col) => (
-                  <SelectItem key={col.id} value={col.id}>
-                    {col.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="primaryLocation">Primary Location</Label>
+            <Input
+              id="primaryLocation"
+              value={primaryLocation}
+              onChange={(e) => setPrimaryLocation(e.target.value)}
+              placeholder="e.g., San Francisco, CA"
+              maxLength={500}
+            />
           </div>
 
           <div className="space-y-2">
@@ -149,28 +141,6 @@ export function CreateApplicationModal({
                 <SelectItem value="On-site">On-site</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="primaryLocation">Primary Location</Label>
-            <Input
-              id="primaryLocation"
-              value={primaryLocation}
-              onChange={(e) => setPrimaryLocation(e.target.value)}
-              placeholder="e.g., San Francisco, CA"
-              maxLength={500}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="postingUrl">Posting URL</Label>
-            <Input
-              id="postingUrl"
-              value={postingUrl}
-              onChange={(e) => setPostingUrl(e.target.value)}
-              placeholder="https://..."
-              maxLength={2000}
-            />
           </div>
 
           <DialogFooter>
