@@ -89,6 +89,15 @@ const SKILLS_HEADINGS = new Set([
 
 const PUBLICATIONS_HEADINGS = new Set([
   "publications", "papers", "research", "research & publications",
+  "publications & patents", "publications and patents",
+]);
+
+const CONTACT_HEADINGS = new Set([
+  "contact", "contact info", "contact information",
+]);
+
+const IGNORED_HEADINGS = new Set([
+  "instructions",
 ]);
 
 const HONORS_PATTERNS = [
@@ -293,6 +302,10 @@ function splitIntoBlocks(markdown: string): Block[] {
     const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
     if (headingMatch) {
       const level = headingMatch[1].length;
+      // Skip H1 lines that are clearly comments/instructions (>60 chars)
+      if (level === 1 && headingMatch[2].trim().length > 60) {
+        continue; // Drop comment-like # lines
+      }
       // Only split on H1 and H2 (top-level structure)
       if (level <= 2) {
         flushBlock();
@@ -458,6 +471,11 @@ function parseMetadataLine(
 }
 
 function parseEducationBlock(content: string): ParsedResume["education"] {
+  // Check if there are any H3 headings; if not, use indented fallback
+  if (!/^###\s+/m.test(content)) {
+    return parseIndentedEducationBlock(content);
+  }
+
   const lines = content.split("\n");
   const entries: ParsedResume["education"] = [];
   let current: ParsedResume["education"][number] | null = null;
@@ -562,6 +580,11 @@ function parseDegreeInstitution(raw: string): {
 }
 
 function parseSkillsBlock(content: string): ParsedResume["skills"] {
+  // Check if there are any bold categories; if not and there are indented lines, use indented fallback
+  if (!/\*\*.+?\*\*/.test(content) && /^\s{4,}\S/m.test(content)) {
+    return parseIndentedSkillsBlock(content);
+  }
+
   const lines = content.split("\n");
   const skills: ParsedResume["skills"] = [];
   const generalItems: string[] = [];
@@ -623,8 +646,12 @@ function parsePublicationsBlock(content: string): ParsedResume["publications"] {
     if (pub) publications.push(pub);
   }
 
-  // If no bullets found, try processing all non-empty lines
+  // If no bullets found, try indented key-value format
   if (publications.length === 0) {
+    const indented = parseIndentedPublicationsBlock(content);
+    if (indented.length > 0) return indented;
+
+    // Last resort: try processing all non-empty lines
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
@@ -689,10 +716,350 @@ function parsePublicationLine(text: string): ParsedResume["publications"][number
     }
   }
 
+  // If no bold title was matched, try period-delimited plain-text citation
+  // e.g., "Title. Journal, Year, Volume, Pages."
+  if (!boldTitleMatch && !publisher && !date) {
+    const periodParts = text.split(/\.\s+/);
+    if (periodParts.length >= 2) {
+      title = periodParts[0].trim();
+      const rest = periodParts.slice(1).join(". ").trim();
+
+      // Try to extract journal and year from rest
+      // Pattern: "Journal, Year, Volume, Pages" or "Journal, Year."
+      const yearMatch = rest.match(/(\d{4})/);
+      if (yearMatch) {
+        date = parseDate(yearMatch[1]);
+        // Everything before the year in the same segment is likely the publisher/journal
+        const beforeYear = rest.substring(0, rest.indexOf(yearMatch[0])).replace(/,\s*$/, "").trim();
+        if (beforeYear) {
+          publisher = beforeYear;
+        }
+        description = rest.replace(/\.\s*$/, "").trim() || null;
+      } else {
+        description = rest.replace(/\.\s*$/, "").trim() || null;
+      }
+    }
+  }
+
   // Clean up trailing punctuation from title
   title = title.replace(/[.,;:]+$/, "").trim();
 
   return title ? { title, publisher, date, url, description } : null;
+}
+
+// ─── CV Format Utilities ────────────────────────────────────────────────────
+
+/**
+ * Strip indented comment lines (4+ spaces then #) and horizontal rules (---+).
+ */
+function preprocessMarkdown(markdown: string): string {
+  return markdown
+    .split("\n")
+    .filter((line) => !/^\s{4,}#\s/.test(line))
+    .filter((line) => !/^---+\s*$/.test(line))
+    .join("\n");
+}
+
+/**
+ * Parse indented key-value content where unindented lines are keys
+ * and indented (4+ spaces) lines are values.
+ */
+function parseIndentedKeyValues(content: string): Map<string, string[]> {
+  const lines = content.split("\n");
+  const map = new Map<string, string[]>();
+  let currentKey: string | null = null;
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+
+    if (/^\s{4,}/.test(line)) {
+      // Indented line → value for current key
+      if (currentKey !== null) {
+        const values = map.get(currentKey) ?? [];
+        values.push(line.trim());
+        map.set(currentKey, values);
+      }
+    } else {
+      // Unindented line → new key
+      currentKey = line.trim().replace(/:+$/, "").trim();
+      if (!map.has(currentKey)) {
+        map.set(currentKey, []);
+      }
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Parse a ## Contact block with indented key-value pairs.
+ */
+function parseContactBlock(content: string): Partial<ParsedResume["contact"]> {
+  const kv = parseIndentedKeyValues(content);
+  const contact: Partial<ParsedResume["contact"]> = {};
+
+  for (const [key, values] of kv) {
+    const keyLower = key.toLowerCase();
+    const val = values[0]?.trim();
+    if (!val) continue;
+
+    if (keyLower === "name") {
+      contact.fullName = val;
+    } else if (keyLower === "email") {
+      contact.email = val;
+    } else if (keyLower.includes("phone")) {
+      contact.phone = val;
+    } else if (keyLower === "location") {
+      contact.location = val;
+    } else if (keyLower.includes("linkedin")) {
+      // Handle markdown link syntax [text](url)
+      const linkMatch = val.match(/\[.*?\]\((.*?)\)/);
+      contact.linkedIn = linkMatch ? linkMatch[1] : val;
+    }
+  }
+
+  return contact;
+}
+
+/**
+ * Experience indicator labels that signal an H2 is a company/experience block.
+ */
+const EXPERIENCE_INDICATORS = [
+  "timeframe", "relevant titles", "key wins",
+  "relevant experience", "leadership style", "leadership",
+  "titles", "experiences", "notable clients",
+];
+
+/**
+ * Check if content has enough experience indicators to be treated as an experience block.
+ */
+function looksLikeExperienceBlock(content: string): boolean {
+  const contentLower = content.toLowerCase();
+  let count = 0;
+  for (const indicator of EXPERIENCE_INDICATORS) {
+    // Match as unindented line (key in indented key-value format) or H3
+    if (new RegExp(`(?:^|\\n)(?:#{3}\\s+)?${indicator}`, "i").test(contentLower)) {
+      count++;
+    }
+  }
+  return count >= 2;
+}
+
+/**
+ * Parse an indented experience block where the H2 heading is the company name.
+ * Handles both simple (no H3 sub-roles) and complex (H3 sub-roles like BASF).
+ */
+function parseIndentedExperienceBlock(
+  company: string,
+  content: string
+): ParsedResume["experiences"] {
+  // Check for H3 sub-roles
+  const h3Pattern = /^###\s+(.+)$/gm;
+  const h3Matches = [...content.matchAll(h3Pattern)];
+
+  if (h3Matches.length > 0) {
+    // Complex case: split on H3s, each becomes a separate experience entry
+    return parseCompanyWithSubRoles(company, content, h3Matches);
+  }
+
+  // Simple case: single experience entry
+  return [parseSingleIndentedExperience(company, content)];
+}
+
+function parseSingleIndentedExperience(
+  company: string,
+  content: string
+): ParsedResume["experiences"][number] {
+  const kv = parseIndentedKeyValues(content);
+
+  let title = "";
+  let startDate: string | null = null;
+  let endDate: string | null = null;
+  const subsections: Array<{ label: string; bullets: string[] }> = [];
+
+  for (const [key, values] of kv) {
+    const keyLower = key.toLowerCase();
+
+    if (keyLower === "timeframe" || keyLower === "timeframe:") {
+      if (values.length > 0) {
+        const { start, end } = parseDateRange(values[0]);
+        startDate = start;
+        endDate = end;
+      }
+    } else if (keyLower.includes("title")) {
+      if (values.length > 0) {
+        title = values[0];
+      }
+    } else if (
+      keyLower === "key wins" || keyLower === "relevant experience" ||
+      keyLower === "leadership style" || keyLower === "leadership" ||
+      keyLower === "experiences"
+    ) {
+      const bullets = extractBullets(values);
+      if (bullets.length > 0) {
+        subsections.push({ label: formatSubsectionLabel(keyLower), bullets });
+      }
+    }
+    // Skip "who is" descriptions, "notable clients", etc.
+  }
+
+  return {
+    company,
+    title,
+    location: null,
+    startDate,
+    endDate,
+    description: null,
+    subsections,
+  };
+}
+
+function parseCompanyWithSubRoles(
+  company: string,
+  content: string,
+  h3Matches: RegExpExecArray[] | RegExpMatchArray[]
+): ParsedResume["experiences"] {
+  const experiences: ParsedResume["experiences"] = [];
+  const lines = content.split("\n");
+
+  // Find line indices of each H3
+  const h3Indices: Array<{ title: string; lineIdx: number }> = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^###\s+(.+)$/);
+    if (m) {
+      h3Indices.push({ title: m[1].trim(), lineIdx: i });
+    }
+  }
+
+  for (let i = 0; i < h3Indices.length; i++) {
+    const startLine = h3Indices[i].lineIdx + 1;
+    const endLine = i + 1 < h3Indices.length ? h3Indices[i + 1].lineIdx : lines.length;
+    const subContent = lines.slice(startLine, endLine).join("\n");
+
+    const entry = parseSingleIndentedExperience(company, subContent);
+    // Use the H3 title as a fallback title if "Relevant Titles" not found
+    if (!entry.title) {
+      entry.title = h3Indices[i].title;
+    }
+    experiences.push(entry);
+  }
+
+  return experiences;
+}
+
+/**
+ * Extract bullet points from indented values, handling sub-indented items.
+ */
+function extractBullets(values: string[]): string[] {
+  const bullets: string[] = [];
+  for (const v of values) {
+    const stripped = v.replace(/^[-*]\s+/, "").trim();
+    if (stripped) {
+      bullets.push(stripped);
+    }
+  }
+  return bullets;
+}
+
+function formatSubsectionLabel(key: string): string {
+  const labelMap: Record<string, string> = {
+    "key wins": "Key Wins",
+    "relevant experience": "Relevant Experience",
+    "leadership style": "Leadership Style",
+    "leadership": "Leadership",
+    "experiences": "Experiences",
+  };
+  return labelMap[key] ?? key;
+}
+
+/**
+ * Indented education fallback: unindented lines = institutions,
+ * indented lines = degree, field, dates.
+ */
+function parseIndentedEducationBlock(content: string): ParsedResume["education"] {
+  const entries: ParsedResume["education"] = [];
+  const kv = parseIndentedKeyValues(content);
+
+  for (const [key, values] of kv) {
+    if (!values.length) continue;
+
+    const institution = key;
+    let degree = "";
+    let fieldOfStudy: string | null = null;
+    let startDate: string | null = null;
+    let endDate: string | null = null;
+
+    for (const v of values) {
+      // Try as date range
+      const dateResult = parseDateRange(v);
+      if (dateResult.start) {
+        startDate = dateResult.start;
+        endDate = dateResult.end;
+        continue;
+      }
+
+      // First non-date value = degree, second = field of study
+      if (!degree) {
+        degree = v;
+      } else if (!fieldOfStudy) {
+        fieldOfStudy = v;
+      }
+    }
+
+    entries.push({
+      institution,
+      degree,
+      fieldOfStudy,
+      startDate,
+      endDate,
+      gpa: null,
+      honors: null,
+      notes: null,
+    });
+  }
+
+  return entries;
+}
+
+/**
+ * Indented skills fallback: unindented lines = category names,
+ * indented lines = items.
+ */
+function parseIndentedSkillsBlock(content: string): ParsedResume["skills"] {
+  const skills: ParsedResume["skills"] = [];
+  const kv = parseIndentedKeyValues(content);
+
+  for (const [category, values] of kv) {
+    if (!values.length) continue;
+    // Flatten all indented lines as items
+    const items: string[] = [];
+    for (const v of values) {
+      items.push(v);
+    }
+    if (items.length > 0) {
+      skills.push({ category, items });
+    }
+  }
+
+  return skills;
+}
+
+/**
+ * Indented publications fallback: unindented lines = category labels (skipped),
+ * indented lines = citation entries.
+ */
+function parseIndentedPublicationsBlock(content: string): ParsedResume["publications"] {
+  const publications: ParsedResume["publications"] = [];
+  const kv = parseIndentedKeyValues(content);
+
+  for (const [, values] of kv) {
+    for (const v of values) {
+      const pub = parsePublicationLine(v);
+      if (pub) publications.push(pub);
+    }
+  }
+
+  return publications;
 }
 
 // ─── Main Parser ────────────────────────────────────────────────────────────
@@ -716,7 +1083,9 @@ export function parseResumeMarkdown(markdown: string): ParsedResume {
     miscellaneous: null,
   };
 
-  const blocks = splitIntoBlocks(markdown);
+  // Preprocess: strip comments and horizontal rules
+  const cleaned = preprocessMarkdown(markdown);
+  const blocks = splitIntoBlocks(cleaned);
 
   if (blocks.length === 0) return result;
 
@@ -736,6 +1105,9 @@ export function parseResumeMarkdown(markdown: string): ParsedResume {
 
     // H1 heading
     if (block.headingLevel === 1) {
+      // Skip instruction-like H1s (long sentences, not names)
+      if (block.heading.length > 80) continue;
+
       if (!foundH1) {
         foundH1 = true;
         result.contact.fullName = block.heading.trim();
@@ -763,7 +1135,19 @@ export function parseResumeMarkdown(markdown: string): ParsedResume {
     // H2 heading — map to known section or custom
     const normalized = normalizeHeading(block.heading);
 
-    if (SUMMARY_HEADINGS.has(normalized)) {
+    // Skip ignored headings
+    if (IGNORED_HEADINGS.has(normalized)) continue;
+
+    // Contact section
+    if (CONTACT_HEADINGS.has(normalized)) {
+      const contactData = parseContactBlock(block.content);
+      if (contactData.fullName) result.contact.fullName = contactData.fullName;
+      if (contactData.email) result.contact.email = contactData.email;
+      if (contactData.phone) result.contact.phone = contactData.phone;
+      if (contactData.location) result.contact.location = contactData.location;
+      if (contactData.linkedIn) result.contact.linkedIn = contactData.linkedIn;
+      if (contactData.website) result.contact.website = contactData.website;
+    } else if (SUMMARY_HEADINGS.has(normalized)) {
       result.contact.summary = block.content.trim() || null;
     } else if (EXPERIENCE_HEADINGS.has(normalized)) {
       result.experiences = parseExperienceBlock(block.content);
@@ -773,6 +1157,10 @@ export function parseResumeMarkdown(markdown: string): ParsedResume {
       result.skills = parseSkillsBlock(block.content);
     } else if (PUBLICATIONS_HEADINGS.has(normalized)) {
       result.publications = parsePublicationsBlock(block.content);
+    } else if (looksLikeExperienceBlock(block.content)) {
+      // Unrecognized H2 that looks like experience → company-as-heading
+      const exps = parseIndentedExperienceBlock(block.heading.trim(), block.content);
+      result.experiences.push(...exps);
     } else {
       // Unrecognized heading → custom section
       result.customSections.push({

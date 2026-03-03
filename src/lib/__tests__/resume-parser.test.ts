@@ -531,3 +531,283 @@ English (Native), Spanish (Conversational)`;
     }
   });
 });
+
+// ─── CV Format Parsing ──────────────────────────────────────────────────────
+
+describe("CV format parsing", () => {
+  it("strips indented comment lines and horizontal rules", () => {
+    const md = `## Education
+
+Georgia Institute of Technology
+    Executive MBA
+    # details can be omitted
+    2024 - 2025
+
+---
+
+## Skills`;
+
+    const result = parseResumeMarkdown(md);
+    // Comments and --- should be stripped; education should parse correctly
+    expect(result.education).toHaveLength(1);
+    expect(result.education[0].institution).toBe("Georgia Institute of Technology");
+  });
+
+  it("parses contact from indented key-value format", () => {
+    const md = `## Contact
+
+Name
+    Alex Rudd
+Location
+    Peachtree City GA, 30269
+Phone Number
+    770-846-8242
+Email:
+    Paul.Alex.Rudd@gmail.com
+LinkedIn Profile
+    [text](https://www.linkedin.com/in/alex-rudd-54389158/)`;
+
+    const result = parseResumeMarkdown(md);
+    expect(result.contact.fullName).toBe("Alex Rudd");
+    expect(result.contact.email).toBe("Paul.Alex.Rudd@gmail.com");
+    expect(result.contact.phone).toBe("770-846-8242");
+    expect(result.contact.location).toBe("Peachtree City GA, 30269");
+    expect(result.contact.linkedIn).toBe("https://www.linkedin.com/in/alex-rudd-54389158/");
+  });
+
+  it("parses education from indented format (3 entries)", () => {
+    const md = `## Education
+
+Georgia Institute of Technology
+    Executive MBA
+    Global Business Specialization
+    2024 - 2025
+
+University of Minnesota
+    Ph.D.
+    Chemistry
+    2009 - 2014
+
+Emory University
+    B.S.
+    Chemistry
+    2005-2009`;
+
+    const result = parseResumeMarkdown(md);
+    expect(result.education).toHaveLength(3);
+
+    expect(result.education[0].institution).toBe("Georgia Institute of Technology");
+    expect(result.education[0].degree).toBe("Executive MBA");
+    expect(result.education[0].fieldOfStudy).toBe("Global Business Specialization");
+    expect(result.education[0].startDate).toBe("2024");
+    expect(result.education[0].endDate).toBe("2025");
+
+    expect(result.education[1].institution).toBe("University of Minnesota");
+    expect(result.education[1].degree).toBe("Ph.D.");
+    expect(result.education[1].fieldOfStudy).toBe("Chemistry");
+
+    expect(result.education[2].institution).toBe("Emory University");
+    expect(result.education[2].degree).toBe("B.S.");
+    expect(result.education[2].fieldOfStudy).toBe("Chemistry");
+  });
+
+  it("parses skills from indented categories", () => {
+    const md = `## Skills
+
+General Skills
+    Safety
+    Sustainability
+    Research and Development
+
+Sales Skills
+    Sales
+    Technical Sales
+    Pre-sales
+    Account Management
+
+AI and ML
+    Python
+    Random Forests
+    Neural Networks`;
+
+    const result = parseResumeMarkdown(md);
+    expect(result.skills.length).toBeGreaterThanOrEqual(3);
+    expect(result.skills[0].category).toBe("General Skills");
+    expect(result.skills[0].items).toContain("Safety");
+
+    const salesSkills = result.skills.find((s) => s.category === "Sales Skills");
+    expect(salesSkills).toBeDefined();
+    expect(salesSkills!.items).toContain("Technical Sales");
+
+    const aiSkills = result.skills.find((s) => s.category === "AI and ML");
+    expect(aiSkills).toBeDefined();
+    expect(aiSkills!.items).toContain("Python");
+  });
+
+  it("parses company-as-H2 experience (Workday)", () => {
+    const md = `## Workday
+
+Timeframe:
+    2024 - 2025
+
+Relevant Titles:
+    Senior Product Manager, Product Owner
+
+Key Wins:
+    - Led enterprise sales business intelligence transition
+    - Led team of 13 for enterprise transitions
+
+Relevant Experience:
+    - Led Adoption & Value group
+    - Worked closely with Sales Strategy teams
+
+Leadership Style
+    - Worked directly with senior managers`;
+
+    const result = parseResumeMarkdown(md);
+    expect(result.experiences).toHaveLength(1);
+    const exp = result.experiences[0];
+    expect(exp.company).toBe("Workday");
+    expect(exp.title).toBe("Senior Product Manager, Product Owner");
+    expect(exp.startDate).toBe("2024");
+    expect(exp.endDate).toBe("2025");
+    expect(exp.subsections.length).toBeGreaterThanOrEqual(2);
+
+    const keyWins = exp.subsections.find((s) => s.label === "Key Wins");
+    expect(keyWins).toBeDefined();
+    expect(keyWins!.bullets).toContain("Led enterprise sales business intelligence transition");
+  });
+
+  it("parses BASF with H3 sub-roles as multiple experience entries", () => {
+    const md = `## BASF
+
+### IP Management
+
+Timeframe:
+    2017 - 2019
+
+Relevant Titles
+    R&D Program Manager, Intellectual Property Manager
+
+Key Wins:
+    - Wrote R&D innovation strategy
+
+Relevant Experience:
+    - Managed innovation efforts for 9 distinct R&D teams
+
+### Leadership Development Program
+
+Timeframe
+    2014 - 2016
+
+Titles
+    Ph.D. Leadership Development Program
+
+Key Wins
+    - The LDP is a highly selective cohort
+
+### Strategic Marketing Manager
+
+Timeframe
+    2015 - 2016
+
+Titles
+    Marketing Manager, Strategic Marketing Manager
+
+Key Wins
+    - Calculated SRM from scratch`;
+
+    const result = parseResumeMarkdown(md);
+    expect(result.experiences.length).toBeGreaterThanOrEqual(3);
+
+    const ipMgmt = result.experiences.find((e) => e.title.includes("R&D Program Manager"));
+    expect(ipMgmt).toBeDefined();
+    expect(ipMgmt!.company).toBe("BASF");
+    expect(ipMgmt!.startDate).toBe("2017");
+    expect(ipMgmt!.endDate).toBe("2019");
+
+    const ldp = result.experiences.find((e) => e.title.includes("Leadership Development"));
+    expect(ldp).toBeDefined();
+    expect(ldp!.company).toBe("BASF");
+    expect(ldp!.startDate).toBe("2014");
+
+    const marketing = result.experiences.find((e) => e.title.includes("Marketing Manager"));
+    expect(marketing).toBeDefined();
+    expect(marketing!.company).toBe("BASF");
+  });
+
+  it("parses publications from indented citations", () => {
+    const md = `## Publications & Patents
+
+Patents
+    A Business Consulting Engine. Provisional US Patent Application. October 31, 2024.
+    Recyclable Composition for Paper Coating. PCT Application WO2022008730A1. July 9, 2021.
+
+Peer Reviewed Publications
+    Pushing the limits of delta bonding in metal-chromium complexes with redox changes and metal swapping. Inorg. Chem., 2015, 54, 7579-7592.
+    Student Involvement in Improving the Culture of Safety in Academic Laboratories. J. Chem. Ed., 2013, 90, 1414-1417.`;
+
+    const result = parseResumeMarkdown(md);
+    expect(result.publications.length).toBeGreaterThanOrEqual(4);
+
+    const patent = result.publications.find((p) =>
+      p.title.includes("Business Consulting Engine")
+    );
+    expect(patent).toBeDefined();
+
+    const paper = result.publications.find((p) =>
+      p.title.includes("Pushing the limits")
+    );
+    expect(paper).toBeDefined();
+  });
+
+  it("ignores Instructions section", () => {
+    const md = `## Instructions
+
+This is a complete markdown file of my resume experience.
+
+## Contact
+
+Name
+    Alex Rudd
+Email:
+    alex@example.com`;
+
+    const result = parseResumeMarkdown(md);
+    expect(result.customSections.find((s) => s.title === "Instructions")).toBeUndefined();
+    expect(result.contact.fullName).toBe("Alex Rudd");
+  });
+
+  it("parses the full Alex Rudd CV", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const cvPath = path.resolve(process.cwd(), "Reference Materials/Alex Rudd CV.md");
+    const cvContent = fs.readFileSync(cvPath, "utf-8");
+
+    const result = parseResumeMarkdown(cvContent);
+
+    // Contact
+    expect(result.contact.fullName).toBe("Alex Rudd");
+    expect(result.contact.email).toBe("Paul.Alex.Rudd@gmail.com");
+    expect(result.contact.phone).toBe("770-846-8242");
+    expect(result.contact.linkedIn).toContain("linkedin.com");
+
+    // Education: 3 entries
+    expect(result.education).toHaveLength(3);
+    expect(result.education[0].institution).toBe("Georgia Institute of Technology");
+    expect(result.education[1].institution).toBe("University of Minnesota");
+    expect(result.education[2].institution).toBe("Emory University");
+
+    // Experiences: at least 7 (Workday, Piedmont, Evalueserve, + BASF sub-roles)
+    expect(result.experiences.length).toBeGreaterThanOrEqual(7);
+
+    // Skills: at least 5 categories
+    expect(result.skills.length).toBeGreaterThanOrEqual(5);
+
+    // Publications: at least 6
+    expect(result.publications.length).toBeGreaterThanOrEqual(6);
+
+    // Instructions section should NOT appear as custom section
+    expect(result.customSections.find((s) => s.title === "Instructions")).toBeUndefined();
+  });
+});
