@@ -260,6 +260,59 @@ describe("compileResumeSource", () => {
     expect(md).toContain("### BS -- MIT");
   });
 
+  it("includes alternate titles in experience heading", () => {
+    const data: CompilerInput = {
+      contact: { fullName: "Test", email: "t@t.com" },
+      experiences: [
+        {
+          title: "Product Manager",
+          company: "Acme Corp",
+          alternateTitles: ["Program Manager", "TPM"],
+        },
+      ],
+    };
+
+    const md = compileResumeSource(data);
+    expect(md).toContain(
+      "### Product Manager | Program Manager | TPM -- Acme Corp"
+    );
+  });
+
+  it("filters out empty alternate titles", () => {
+    const data: CompilerInput = {
+      contact: { fullName: "Test", email: "t@t.com" },
+      experiences: [
+        {
+          title: "Product Manager",
+          company: "Acme Corp",
+          alternateTitles: ["Program Manager", "", "  ", "TPM"],
+        },
+      ],
+    };
+
+    const md = compileResumeSource(data);
+    expect(md).toContain(
+      "### Product Manager | Program Manager | TPM -- Acme Corp"
+    );
+  });
+
+  it("outputs standard heading when no alternate titles exist", () => {
+    const data: CompilerInput = {
+      contact: { fullName: "Test", email: "t@t.com" },
+      experiences: [
+        {
+          title: "Product Manager",
+          company: "Acme Corp",
+          alternateTitles: [],
+        },
+      ],
+    };
+
+    const md = compileResumeSource(data);
+    expect(md).toContain("### Product Manager -- Acme Corp");
+    expect(md).not.toContain("|");
+  });
+
   it("handles publication with year-only date", () => {
     const data: CompilerInput = {
       contact: { fullName: "Test", email: "t@t.com" },

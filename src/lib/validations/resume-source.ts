@@ -60,6 +60,10 @@ export const experienceUpdateSchema = z.object({
   startDate: optionalDate(),
   endDate: optionalDate(),
   description: optionalTrimmedString(10000),
+  alternateTitles: z
+    .array(z.string().trim().min(1).max(200))
+    .max(10)
+    .optional(),
 });
 export type ExperienceInput = z.infer<typeof experienceUpdateSchema>;
 

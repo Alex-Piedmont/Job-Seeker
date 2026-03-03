@@ -27,7 +27,9 @@ import {
   Trash2,
   Plus,
   ChevronsUpDown,
+  X,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { SaveIndicator } from "./save-indicator";
 import { DatePicker } from "./date-picker";
@@ -55,8 +57,12 @@ function ExperienceCard({
   onSaved: (updated: ResumeWorkExperience) => void;
   onDelete: () => void;
 }) {
-  const [fields, setFields] = useState(entry);
+  const [fields, setFields] = useState({
+    ...entry,
+    alternateTitles: entry.alternateTitles ?? [],
+  });
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [altTitleInput, setAltTitleInput] = useState("");
 
   const saveEntry = useCallback(
     async (data: ResumeWorkExperience) => {
@@ -70,6 +76,7 @@ function ExperienceCard({
           startDate: data.startDate || null,
           endDate: data.endDate || null,
           description: data.description || null,
+          alternateTitles: data.alternateTitles ?? [],
         }),
       });
       if (!res.ok) {
@@ -86,7 +93,7 @@ function ExperienceCard({
 
   const handleChange = (
     field: keyof ResumeWorkExperience,
-    value: string | null
+    value: string | string[] | null
   ) => {
     const updated = { ...fields, [field]: value };
     setFields(updated);
@@ -215,6 +222,101 @@ function ExperienceCard({
                       placeholder="Senior PM"
                     />
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Alternate Titles</Label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {fields.alternateTitles.map((alt, idx) => (
+                      <Badge key={idx} variant="secondary" className="gap-1">
+                        {alt}
+                        <button
+                          onClick={() => {
+                            const updated = fields.alternateTitles.filter(
+                              (_, i) => i !== idx
+                            );
+                            const updatedFields = {
+                              ...fields,
+                              alternateTitles: updated,
+                            };
+                            setFields(updatedFields);
+                            trigger(updatedFields);
+                          }}
+                          className="ml-0.5 hover:text-destructive"
+                          aria-label={`Remove ${alt}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <Input
+                    value={altTitleInput}
+                    onChange={(e) => setAltTitleInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === ",") {
+                        e.preventDefault();
+                        const trimmed = altTitleInput.trim();
+                        if (
+                          !trimmed ||
+                          fields.alternateTitles.length >= 10 ||
+                          fields.alternateTitles.some(
+                            (t) => t.toLowerCase() === trimmed.toLowerCase()
+                          ) ||
+                          fields.title.toLowerCase() === trimmed.toLowerCase()
+                        )
+                          return;
+                        const updated = [
+                          ...fields.alternateTitles,
+                          trimmed,
+                        ];
+                        const updatedFields = {
+                          ...fields,
+                          alternateTitles: updated,
+                        };
+                        setFields(updatedFields);
+                        setAltTitleInput("");
+                        trigger(updatedFields);
+                      }
+                      if (
+                        e.key === "Backspace" &&
+                        !altTitleInput &&
+                        fields.alternateTitles.length > 0
+                      ) {
+                        const updated = fields.alternateTitles.slice(0, -1);
+                        const updatedFields = {
+                          ...fields,
+                          alternateTitles: updated,
+                        };
+                        setFields(updatedFields);
+                        trigger(updatedFields);
+                      }
+                    }}
+                    onBlur={() => {
+                      const trimmed = altTitleInput.trim();
+                      if (
+                        trimmed &&
+                        fields.alternateTitles.length < 10 &&
+                        !fields.alternateTitles.some(
+                          (t) => t.toLowerCase() === trimmed.toLowerCase()
+                        ) &&
+                        fields.title.toLowerCase() !== trimmed.toLowerCase()
+                      ) {
+                        const updated = [
+                          ...fields.alternateTitles,
+                          trimmed,
+                        ];
+                        const updatedFields = {
+                          ...fields,
+                          alternateTitles: updated,
+                        };
+                        setFields(updatedFields);
+                        setAltTitleInput("");
+                        trigger(updatedFields);
+                      }
+                    }}
+                    placeholder="Type alternate title and press Enter to add..."
+                    className="text-sm"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Location</Label>

@@ -41,6 +41,7 @@ export type ResumeWorkExperience = {
   startDate: string | null;
   endDate: string | null;
   description: string | null;
+  alternateTitles: string[];
   sortOrder: number;
   subsections: ResumeWorkSubsection[];
 };

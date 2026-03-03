@@ -35,6 +35,7 @@ export type CompilerInput = {
     startDate?: string | null;
     endDate?: string | null;
     description?: string | null;
+    alternateTitles?: string[];
     subsections?: Array<{
       label?: string | null;
       bullets?: string[];
@@ -117,7 +118,14 @@ export function compileResumeSource(data: CompilerInput): string {
 
     for (const exp of validExperiences) {
       sections.push("");
-      sections.push(`### ${exp.title!.trim()} -- ${exp.company!.trim()}`);
+      const altTitles = (exp.alternateTitles ?? [])
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+      const titlePart =
+        altTitles.length > 0
+          ? `${exp.title!.trim()} | ${altTitles.join(" | ")}`
+          : exp.title!.trim();
+      sections.push(`### ${titlePart} -- ${exp.company!.trim()}`);
 
       const datePart = exp.startDate
         ? `${formatDate(exp.startDate)} - ${formatDate(exp.endDate)}`
