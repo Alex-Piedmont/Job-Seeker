@@ -25,7 +25,7 @@ export function SummaryCards(props: SummaryCardsProps) {
           <CardContent className="p-4">
             <dl>
               <dt className="flex items-center gap-2 text-sm text-muted-foreground">
-                <card.icon className="h-4 w-4" />
+                <card.icon className="h-4 w-4 text-primary" />
                 {card.label}
               </dt>
               <dd className="mt-1 text-3xl font-bold">{props[card.field]}</dd>

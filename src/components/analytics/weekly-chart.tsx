@@ -76,7 +76,7 @@ export function WeeklyChart({ weeklyApplications }: WeeklyChartProps) {
                 <Line
                   type="monotone"
                   dataKey="count"
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--color-primary)"
                   strokeWidth={2}
                   dot={{ r: 3 }}
                   activeDot={{ r: 5 }}

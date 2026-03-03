@@ -28,9 +28,9 @@ interface ColumnSettingsMenuProps {
 }
 
 const COLOR_PRESETS = [
+  "#002060", "#cc0099", "#5991FF", "#E6E7E8",
   "#6366f1", "#3b82f6", "#f59e0b", "#8b5cf6",
-  "#22c55e", "#ef4444", "#ec4899", "#14b8a6",
-  "#f97316", "#64748b", "#84cc16", "#06b6d4",
+  "#22c55e", "#ef4444", "#14b8a6", "#f97316",
 ];
 
 export function ColumnSettingsMenu({

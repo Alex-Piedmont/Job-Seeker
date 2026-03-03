@@ -117,9 +117,9 @@ export function getStalenessLevel(
 // ─── Default Columns ────────────────────────────────────────────────────────
 
 export const DEFAULT_COLUMNS = [
-  { name: "Saved", order: 0, color: "#6366f1", columnType: null },
-  { name: "Applied", order: 1, color: "#3b82f6", columnType: null },
-  { name: "Screening", order: 2, color: "#f59e0b", columnType: null },
+  { name: "Saved", order: 0, color: "#5991FF", columnType: null },
+  { name: "Applied", order: 1, color: "#002060", columnType: null },
+  { name: "Screening", order: 2, color: "#cc0099", columnType: null },
   { name: "Interview", order: 3, color: "#8b5cf6", columnType: null },
   { name: "Offer", order: 4, color: "#22c55e", columnType: "OFFER" },
   { name: "Closed", order: 5, color: "#ef4444", columnType: "CLOSED" },

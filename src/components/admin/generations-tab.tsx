@@ -174,7 +174,7 @@ export function GenerationsTab() {
               />
               <Bar
                 dataKey="count"
-                fill="hsl(var(--primary))"
+                fill="var(--color-primary)"
                 radius={[2, 2, 0, 0]}
               />
             </BarChart>
@@ -210,7 +210,7 @@ export function GenerationsTab() {
               <Line
                 type="monotone"
                 dataKey="cumulativeCost"
-                stroke="hsl(var(--primary))"
+                stroke="var(--color-primary)"
                 strokeWidth={2}
                 dot={false}
               />

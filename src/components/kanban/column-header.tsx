@@ -22,7 +22,7 @@ export function ColumnHeader({
 }: ColumnHeaderProps) {
   return (
     <div
-      className="flex items-center justify-between px-2 py-2"
+      className="flex items-center justify-between px-3 py-2.5 border-b border-border/30"
       {...dragHandleProps}
     >
       <div className="flex items-center gap-2 min-w-0">

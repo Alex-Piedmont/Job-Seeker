@@ -83,7 +83,7 @@ export function ClosureBreakdown({
                   dataKey="rejectedCount"
                   name="Rejected"
                   stackId="a"
-                  fill="#ef4444"
+                  fill="var(--color-destructive)"
                   radius={[0, 0, 0, 0]}
                   barSize={24}
                 />
@@ -91,7 +91,7 @@ export function ClosureBreakdown({
                   dataKey="ghostedCount"
                   name="Ghosted"
                   stackId="a"
-                  fill="#9ca3af"
+                  fill="var(--color-muted-foreground)"
                   radius={[0, 4, 4, 0]}
                   barSize={24}
                 />

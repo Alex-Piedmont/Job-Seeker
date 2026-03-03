@@ -265,3 +265,31 @@ src/
 
 ### All PRDs Complete
 PRDs 1-7 fully implemented. 203 tests passing. Production-ready.
+
+---
+
+## Visual Overhaul (Brand Theme) — COMPLETE
+
+- [x] Phase 1: Color foundation — replaced all `:root` and `.dark` CSS variables in `globals.css` with brand OKLch values (navy primary, magenta secondary, bright blue accent/ring, brand gray muted, navy-tinted sidebar, brand chart palette)
+- [x] Phase 2: Fixed broken `hsl(var(--primary))` in 4 chart files → `var(--color-primary)` / `var(--color-destructive)` / `var(--color-muted-foreground)`
+- [x] Phase 3: Component polish — nav backdrop blur + accent active state, card hover shadow, kanban column rounded-xl with border, application card hover lift, column header border-b, summary card icons text-primary
+- [x] Phase 4: Brand alignment — sign-in gradient (navy→purple→magenta), default column colors use brand hex, color picker leads with brand colors
+
+### Files Modified
+- `src/app/globals.css` — Complete color variable replacement (light + dark mode)
+- `src/components/analytics/weekly-chart.tsx` — Fixed chart stroke color
+- `src/components/admin/generations-tab.tsx` — Fixed bar fill + line stroke
+- `src/components/admin/overview-tab.tsx` — Fixed bar fill
+- `src/components/analytics/closure-breakdown.tsx` — Replaced hardcoded hex with CSS vars
+- `src/components/nav-bar.tsx` — Backdrop blur, accent-based active nav
+- `src/components/ui/card.tsx` — Hover shadow transition
+- `src/components/kanban/kanban-column.tsx` — Rounded-xl, border, shadow
+- `src/components/kanban/application-card.tsx` — Hover lift animation
+- `src/components/kanban/column-header.tsx` — Border-b, adjusted padding
+- `src/components/analytics/summary-cards.tsx` — Brand-colored icons
+- `src/app/signin/page.tsx` — Gradient background, shadow-2xl card
+- `src/lib/kanban-utils.ts` — Brand hex default columns
+- `src/components/kanban/column-settings-menu.tsx` — Brand colors in picker
+
+### Verification
+- `npm run build` — succeeds, 0 errors

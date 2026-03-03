@@ -32,8 +32,8 @@ function SignInContent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#002060] via-[#4a0e6b] to-[#cc0099] px-4">
+      <Card className="w-full max-w-sm shadow-2xl border-0">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Job Seeker</CardTitle>
           <CardDescription>

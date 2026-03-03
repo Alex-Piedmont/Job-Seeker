@@ -61,7 +61,7 @@ export function ApplicationCard({
   return (
     <div
       className={cn(
-        "group relative rounded-lg border bg-card p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow",
+        "group relative rounded-lg border bg-card p-3 shadow-sm cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200",
         staleness === "muted" && "opacity-60",
         staleness === "warning" && "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
       )}

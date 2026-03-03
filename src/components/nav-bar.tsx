@@ -49,7 +49,7 @@ export function NavBar() {
     : navLinks;
 
   return (
-    <nav className="border-b bg-background">
+    <nav className="border-b border-primary/10 bg-background/95 backdrop-blur-sm">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
         {/* Logo */}
         <Link href="/dashboard" className="text-lg font-semibold">
@@ -61,8 +61,9 @@ export function NavBar() {
           {allLinks.map((link) => (
             <Link key={link.href} href={link.href}>
               <Button
-                variant={pathname.startsWith(link.href) ? "secondary" : "ghost"}
+                variant="ghost"
                 size="sm"
+                className={pathname.startsWith(link.href) ? "bg-accent text-accent-foreground" : ""}
               >
                 {link.label}
               </Button>
@@ -126,8 +127,8 @@ export function NavBar() {
                 {allLinks.map((link) => (
                   <Link key={link.href} href={link.href}>
                     <Button
-                      variant={pathname.startsWith(link.href) ? "secondary" : "ghost"}
-                      className="w-full justify-start"
+                      variant="ghost"
+                      className={`w-full justify-start ${pathname.startsWith(link.href) ? "bg-accent text-accent-foreground" : ""}`}
                     >
                       {link.label}
                     </Button>

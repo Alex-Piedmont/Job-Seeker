@@ -38,7 +38,7 @@ export function KanbanColumn({
   return (
     <div
       className={cn(
-        "flex flex-col bg-muted/50 rounded-lg min-w-[280px] w-[280px] max-h-full",
+        "flex flex-col bg-muted/40 rounded-xl border border-border/50 shadow-sm min-w-[280px] w-[280px] max-h-full",
         "snap-start shrink-0"
       )}
     >

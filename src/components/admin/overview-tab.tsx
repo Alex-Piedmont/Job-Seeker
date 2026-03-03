@@ -133,7 +133,7 @@ export function OverviewTab() {
               />
               <Bar
                 dataKey="count"
-                fill="hsl(var(--primary))"
+                fill="var(--color-primary)"
                 radius={[2, 2, 0, 0]}
               />
             </BarChart>
