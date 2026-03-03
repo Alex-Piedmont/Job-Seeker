@@ -58,6 +58,7 @@ export type ResumePublication = {
   id: string;
   resumeSourceId: string;
   title: string;
+  publicationType: string | null;
   publisher: string | null;
   date: string | null;
   url: string | null;

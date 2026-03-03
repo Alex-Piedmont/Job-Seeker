@@ -102,6 +102,7 @@ export type SkillInput = z.infer<typeof skillUpdateSchema>;
 // Publication
 export const publicationCreateSchema = z.object({
   title: trimmedString(200).default("New Publication"),
+  publicationType: optionalTrimmedString(100),
   publisher: optionalTrimmedString(200),
   date: z
     .string()
@@ -115,6 +116,7 @@ export const publicationCreateSchema = z.object({
 
 export const publicationUpdateSchema = z.object({
   title: trimmedString(200).optional(),
+  publicationType: optionalTrimmedString(100),
   publisher: optionalTrimmedString(200),
   date: z
     .string()

@@ -299,10 +299,11 @@ model ResumeSkill {
 }
 
 model ResumePublication {
-  id             String  @id @default(cuid())
-  resumeSourceId String
-  title          String
-  publisher      String?
+  id              String  @id @default(cuid())
+  resumeSourceId  String
+  title           String
+  publicationType String?
+  publisher       String?
   date           String?
   url            String?
   description    String? @db.Text

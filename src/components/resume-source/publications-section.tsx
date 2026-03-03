@@ -7,6 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -21,6 +28,17 @@ import { SaveIndicator } from "./save-indicator";
 import { DatePicker } from "./date-picker";
 import type { ResumePublication } from "@/types/resume-source";
 import { toast } from "sonner";
+
+const PUBLICATION_TYPES = [
+  "Patent",
+  "Peer-Reviewed Paper",
+  "Book",
+  "Magazine Article",
+  "Substack",
+  "Blog Post",
+  "White Paper",
+  "Other",
+] as const;
 
 type PublicationsSectionProps = {
   publications: ResumePublication[];
@@ -52,6 +70,7 @@ function PublicationCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: data.title,
+          publicationType: data.publicationType || null,
           publisher: data.publisher || null,
           date: data.date || null,
           url: data.url || null,
@@ -88,14 +107,35 @@ function PublicationCard({
               </div>
               <button
                 onClick={onToggle}
-                className="flex flex-1 items-center gap-2 text-left text-sm font-medium"
+                className="flex flex-1 items-center gap-2 text-left text-sm"
               >
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-                {fields.title || "New Publication"}
+                <span className="shrink-0">
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold leading-tight">
+                    {fields.title || "New Publication"}
+                  </span>
+                  {(fields.publicationType || fields.date) && (
+                    <span className="text-xs text-muted-foreground">
+                      {[
+                        fields.publicationType,
+                        fields.date?.slice(0, 4),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  )}
+                  {fields.publisher && (
+                    <span className="text-xs text-muted-foreground">
+                      {fields.publisher}
+                    </span>
+                  )}
+                </div>
               </button>
               <SaveIndicator status={status} />
               <Button
@@ -117,6 +157,28 @@ function PublicationCard({
                     onBlur={handleBlur}
                     placeholder="Publication Title"
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Type</Label>
+                  <Select
+                    value={fields.publicationType ?? ""}
+                    onValueChange={(v) => {
+                      const val = v || null;
+                      handleChange("publicationType", val);
+                      trigger({ ...fields, publicationType: val });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PUBLICATION_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Publisher</Label>
