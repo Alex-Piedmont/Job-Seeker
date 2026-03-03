@@ -37,6 +37,15 @@ export function KanbanBoard() {
   const [hiddenColumnIds, setHiddenColumnIds] = useState<Set<string>>(
     new Set()
   );
+  const [collapsedColumnIds, setCollapsedColumnIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const saved = localStorage.getItem("kanban-collapsed-columns");
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [settingsColumnId, setSettingsColumnId] = useState<string | null>(null);
@@ -218,6 +227,21 @@ export function KanbanBoard() {
     setHiddenColumnIds(new Set());
   };
 
+  const handleToggleCollapse = (columnId: string) => {
+    setCollapsedColumnIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(columnId)) {
+        next.delete(columnId);
+      } else {
+        next.add(columnId);
+      }
+      try {
+        localStorage.setItem("kanban-collapsed-columns", JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  };
+
   const handleApplicationCreated = () => {
     setCreateModalOpen(false);
     fetchBoard();
@@ -324,6 +348,8 @@ export function KanbanBoard() {
                             column={column}
                             onCardClick={setSelectedAppId}
                             onSettingsClick={setSettingsColumnId}
+                            collapsed={collapsedColumnIds.has(column.id)}
+                            onToggleCollapse={() => handleToggleCollapse(column.id)}
                             columnDragHandleProps={
                               colProvided.dragHandleProps ?? undefined
                             }
@@ -458,11 +484,11 @@ function BoardSkeleton() {
       </div>
       <div className="flex gap-4 overflow-hidden flex-1">
         {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="w-[280px] shrink-0 space-y-2">
+          <div key={i} className="w-[320px] shrink-0 space-y-2">
             <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-            {i <= 2 && <Skeleton className="h-24 w-full" />}
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+            {i <= 2 && <Skeleton className="h-28 w-full" />}
           </div>
         ))}
       </div>

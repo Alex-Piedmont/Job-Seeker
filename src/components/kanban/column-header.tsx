@@ -1,6 +1,6 @@
 "use client";
 
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -9,6 +9,8 @@ interface ColumnHeaderProps {
   color: string;
   applicationCount: number;
   onSettingsClick: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dragHandleProps?: any;
 }
@@ -18,6 +20,8 @@ export function ColumnHeader({
   color,
   applicationCount,
   onSettingsClick,
+  collapsed,
+  onToggleCollapse,
   dragHandleProps,
 }: ColumnHeaderProps) {
   return (
@@ -26,6 +30,24 @@ export function ColumnHeader({
       {...dragHandleProps}
     >
       <div className="flex items-center gap-2 min-w-0">
+        {onToggleCollapse && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCollapse();
+            }}
+            aria-label={collapsed ? `Expand ${name}` : `Collapse ${name}`}
+            className="shrink-0"
+          >
+            {collapsed ? (
+              <ChevronRight className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronLeft className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        )}
         <div
           className="h-3 w-3 rounded-full shrink-0"
           style={{ backgroundColor: color }}

@@ -24,26 +24,28 @@ export function RejectionDialog({
   onConfirm,
   onCancel,
 }: RejectionDialogProps) {
-  const [rejectionDate, setRejectionDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [rejectionDate, setRejectionDate] = useState("");
   const [ghosted, setGhosted] = useState(false);
+
+  const today = () => new Date().toISOString().split("T")[0];
 
   const handleConfirm = () => {
     if (ghosted) {
-      onConfirm(new Date().toISOString().split("T")[0], "ghosted");
+      onConfirm(today(), "ghosted");
     } else {
-      onConfirm(rejectionDate || null, rejectionDate ? "rejected" : null);
+      // Use entered date, or default to today if left empty
+      const date = rejectionDate || today();
+      onConfirm(date, "rejected");
     }
     // Reset
     setGhosted(false);
-    setRejectionDate(new Date().toISOString().split("T")[0]);
+    setRejectionDate("");
   };
 
   const handleSkip = () => {
     onConfirm(null, null);
     setGhosted(false);
-    setRejectionDate(new Date().toISOString().split("T")[0]);
+    setRejectionDate("");
   };
 
   return (
