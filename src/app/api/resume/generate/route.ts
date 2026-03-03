@@ -120,4 +120,4 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
       { status: 500 }
     );
   }
-});
+}, { rateLimit: "resume-generate" });

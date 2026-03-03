@@ -20,7 +20,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { Menu, LogOut } from "lucide-react";
+import { Menu, LogOut, Download } from "lucide-react";
 import { UsageBadge } from "@/components/resume/usage-badge";
 
 const navLinks = [
@@ -97,6 +97,12 @@ export function NavBar() {
                 </div>
               </div>
               <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <a href="/api/export" download>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Data
+                </a>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/signin" })}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign out

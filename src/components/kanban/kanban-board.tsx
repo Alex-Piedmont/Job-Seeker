@@ -19,6 +19,8 @@ import { CreateApplicationModal } from "./create-application-modal";
 import { ApplicationDetailDrawer } from "./application-detail-drawer";
 import { RejectionDialog } from "./rejection-dialog";
 import { ColumnSettingsMenu } from "./column-settings-menu";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Briefcase } from "lucide-react";
 import { matchesSearch } from "@/lib/kanban-utils";
 
 interface BoardData {
@@ -259,6 +261,25 @@ export function KanbanBoard() {
     boardData.applicationCount >= boardData.applicationCap &&
     session.user.role !== "ADMIN";
 
+  if (boardData.applicationCount === 0 && !searchQuery) {
+    return (
+      <>
+        <EmptyState
+          icon={Briefcase}
+          title="No applications yet"
+          description="Start tracking your job applications by adding your first one to the board."
+          action={{ label: "Add Application", onClick: () => setCreateModalOpen(true) }}
+        />
+        <CreateApplicationModal
+          open={createModalOpen}
+          onOpenChange={setCreateModalOpen}
+          columns={boardData.columns}
+          onCreated={handleApplicationCreated}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <SearchFilterBar
@@ -366,6 +387,7 @@ export function KanbanBoard() {
                           toast.error(err.error || "Failed to create column");
                           return;
                         }
+                        toast.success("Column created");
                         fetchBoard();
                       } catch {
                         toast.error("Failed to create column");

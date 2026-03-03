@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Clock } from "lucide-react";
+import { ChevronDown, Clock, FileText } from "lucide-react";
 import { DownloadButton } from "./download-button";
 
 interface Generation {
@@ -24,7 +24,14 @@ export function GenerationHistory({
 }: GenerationHistoryProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  if (generations.length === 0) return null;
+  if (generations.length === 0) {
+    return (
+      <div className="flex flex-col items-center py-6 text-center">
+        <FileText className="h-8 w-8 text-muted-foreground/40 mb-2" />
+        <p className="text-sm text-muted-foreground">No resumes generated yet</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">

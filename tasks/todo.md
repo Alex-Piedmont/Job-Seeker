@@ -234,5 +234,34 @@ src/
 
 ---
 
-## Remaining PRDs
-- PRD 7: Polish, Donations & Deployment
+## PRD 7: Polish, Donations & Deployment — COMPLETE
+
+- [x] Phase 1: Error boundaries (global error.tsx, not-found.tsx, 4 route-level error.tsx, ErrorBoundary class component)
+- [x] Phase 2: Toast audit (column create success toast, detail drawer save success toast)
+- [x] Phase 3: Empty states (reusable EmptyState component, refactored analytics empty state, kanban board 0-app state, generation history empty state)
+- [x] Phase 4: Loading skeletons (5 loading.tsx files for applications, resume-source, analytics, admin, dashboard)
+- [x] Phase 5: Rate limiting (@upstash/ratelimit + @upstash/redis, graceful degradation when env not set, 3 categories, authenticatedHandler integration, admin exempt, 4 unit tests)
+- [x] Phase 6: Mobile responsiveness audit (detail drawer grid-cols responsive, 44px touch targets on collapsible sections)
+- [x] Phase 7: Data export (GET /api/export with full user data, Content-Disposition download, nav bar "Export Data" menu item, 4 integration tests)
+- [x] Phase 8: Ko-fi widget (KofiButton with NEXT_PUBLIC_KOFI_ID, fixed bottom-right, authenticated layout integration)
+- [x] Phase 9: Documentation (expanded .env.example with all env vars, full README with setup/deployment/env var reference)
+- [x] Phase 10: Build verification (tsc 0 errors, 203/203 tests pass, next build succeeds)
+
+### Key Files Created
+- `src/app/error.tsx` — Global error boundary
+- `src/app/not-found.tsx` — Custom 404
+- `src/app/(authenticated)/*/error.tsx` — Route-level error boundaries (4 files)
+- `src/components/error-boundary.tsx` — React class component for inline error containment
+- `src/components/ui/empty-state.tsx` — Reusable empty state (icon, title, description, action)
+- `src/app/(authenticated)/*/loading.tsx` — Route-level loading skeletons (5 files)
+- `src/lib/rate-limit.ts` — Upstash rate limiting with graceful degradation
+- `src/app/api/export/route.ts` — Full data export endpoint
+- `src/components/kofi-button.tsx` — Ko-fi donation button
+
+### Verification
+- `npx tsc --noEmit` — 0 errors
+- `npm run test` — 203/203 tests pass (8 new for PRD 7)
+- `npm run build` — succeeds (32 routes)
+
+### All PRDs Complete
+PRDs 1-7 fully implemented. 203 tests passing. Production-ready.

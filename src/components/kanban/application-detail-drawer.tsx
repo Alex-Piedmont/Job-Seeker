@@ -102,7 +102,7 @@ function CollapsibleSection({
   return (
     <div>
       <button
-        className="flex items-center gap-2 w-full py-2 text-sm font-medium hover:text-foreground/80"
+        className="flex items-center gap-2 w-full min-h-[44px] py-2.5 text-sm font-medium hover:text-foreground/80"
         onClick={() => setOpen(!open)}
       >
         <ChevronDown
@@ -235,6 +235,7 @@ export function ApplicationDetailDrawer({
         toast.error("Failed to save changes");
         return;
       }
+      toast.success("Changes saved");
       onUpdated();
     } catch {
       toast.error("Failed to save changes");
@@ -378,7 +379,7 @@ export function ApplicationDetailDrawer({
               </div>
 
               {/* Core Fields */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Company</Label>
                   <Input
@@ -401,7 +402,7 @@ export function ApplicationDetailDrawer({
 
               {/* Info Section */}
               <CollapsibleSection title="Info">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Posting #</Label>
                     <Input
@@ -505,7 +506,7 @@ export function ApplicationDetailDrawer({
 
               {/* Compensation */}
               <CollapsibleSection title="Compensation">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Salary Min ($)</Label>
                     <Input
@@ -529,7 +530,7 @@ export function ApplicationDetailDrawer({
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Bonus Target (%)</Label>
                     <Input
@@ -567,7 +568,7 @@ export function ApplicationDetailDrawer({
 
               {/* Dates */}
               <CollapsibleSection title="Dates">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Date Posted</Label>
                     <Input
@@ -601,7 +602,7 @@ export function ApplicationDetailDrawer({
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Rejection Date</Label>
                     <Input
