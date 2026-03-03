@@ -1,10 +1,11 @@
 "use client";
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Check, Circle } from "lucide-react";
-import type { ResumeSourceData } from "@/types/resume-source";
+import { Button } from "@/components/ui/button";
+import { Check, Circle, Plus } from "lucide-react";
+import type { ResumeSourceData, ResumeCustomSection } from "@/types/resume-source";
 
-const SECTIONS = [
+const BUILT_IN_SECTIONS = [
   { value: "contact", label: "Contact" },
   { value: "education", label: "Education" },
   { value: "experience", label: "Work Experience" },
@@ -12,9 +13,9 @@ const SECTIONS = [
   { value: "publications", label: "Publications" },
 ] as const;
 
-export type SectionTab = (typeof SECTIONS)[number]["value"];
+export type BuiltInTab = (typeof BUILT_IN_SECTIONS)[number]["value"];
 
-function hasData(data: ResumeSourceData | null, section: SectionTab): boolean {
+function hasBuiltInData(data: ResumeSourceData | null, section: BuiltInTab): boolean {
   if (!data) return false;
   switch (section) {
     case "contact":
@@ -31,23 +32,28 @@ function hasData(data: ResumeSourceData | null, section: SectionTab): boolean {
 }
 
 type SectionTabsProps = {
-  activeTab: SectionTab;
-  onTabChange: (tab: SectionTab) => void;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
   data: ResumeSourceData | null;
+  onAddSection?: () => void;
 };
 
-export function SectionTabs({ activeTab, onTabChange, data }: SectionTabsProps) {
+export function SectionTabs({ activeTab, onTabChange, data, onAddSection }: SectionTabsProps) {
+  const customSections: ResumeCustomSection[] = data?.customSections ?? [];
+  const hasMisc = !!data?.miscellaneous?.trim();
+  const canAddSection = customSections.length < 20;
+
   return (
-    <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as SectionTab)}>
+    <Tabs value={activeTab} onValueChange={onTabChange}>
       <TabsList className="w-full justify-start overflow-x-auto" role="tablist">
-        {SECTIONS.map((section) => (
+        {BUILT_IN_SECTIONS.map((section) => (
           <TabsTrigger
             key={section.value}
             value={section.value}
             role="tab"
             className="gap-1.5"
           >
-            {hasData(data, section.value) ? (
+            {hasBuiltInData(data, section.value) ? (
               <Check className="h-3.5 w-3.5 text-green-600" />
             ) : (
               <Circle className="h-3.5 w-3.5 text-muted-foreground" />
@@ -55,6 +61,49 @@ export function SectionTabs({ activeTab, onTabChange, data }: SectionTabsProps) 
             {section.label}
           </TabsTrigger>
         ))}
+
+        {customSections.map((section) => (
+          <TabsTrigger
+            key={`custom:${section.id}`}
+            value={`custom:${section.id}`}
+            role="tab"
+            className="gap-1.5"
+          >
+            {section.content.trim() ? (
+              <Check className="h-3.5 w-3.5 text-green-600" />
+            ) : (
+              <Circle className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+            {section.title}
+          </TabsTrigger>
+        ))}
+
+        {hasMisc && (
+          <TabsTrigger
+            value="miscellaneous"
+            role="tab"
+            className="gap-1.5"
+          >
+            <Check className="h-3.5 w-3.5 text-green-600" />
+            Miscellaneous
+          </TabsTrigger>
+        )}
+
+        {onAddSection && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddSection();
+            }}
+            disabled={!canAddSection}
+            className="h-8 w-8 p-0 ml-1"
+            title="Add custom section"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </TabsList>
     </Tabs>
   );

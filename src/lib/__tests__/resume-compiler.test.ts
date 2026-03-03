@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  compileResumeSource,
-  formatDate,
-  type ResumeSourceData,
-} from "@/lib/resume-compiler";
+import { compileResumeSource, formatDate, type CompilerInput } from "@/lib/resume-compiler";
 
 describe("formatDate", () => {
   it("formats YYYY-MM as Mon YYYY", () => {
@@ -28,7 +24,7 @@ describe("compileResumeSource", () => {
   });
 
   it("compiles full source with all sections", () => {
-    const data: ResumeSourceData = {
+    const data: CompilerInput = {
       contact: {
         fullName: "Alex Rudd",
         email: "alex@example.com",
@@ -114,7 +110,7 @@ describe("compileResumeSource", () => {
   });
 
   it("compiles source with only contact info (no empty section headings)", () => {
-    const data: ResumeSourceData = {
+    const data: CompilerInput = {
       contact: {
         fullName: "Jane Doe",
         email: "jane@example.com",
@@ -132,7 +128,7 @@ describe("compileResumeSource", () => {
   });
 
   it("omits null optional fields without dangling pipes", () => {
-    const data: ResumeSourceData = {
+    const data: CompilerInput = {
       contact: {
         fullName: "Jane Doe",
         email: "jane@example.com",
@@ -158,7 +154,7 @@ describe("compileResumeSource", () => {
   });
 
   it("omits entries with missing required fields", () => {
-    const data: ResumeSourceData = {
+    const data: CompilerInput = {
       contact: { fullName: "Jane Doe", email: "jane@example.com" },
       education: [
         { institution: "", degree: "BS", fieldOfStudy: null },
@@ -180,7 +176,7 @@ describe("compileResumeSource", () => {
   });
 
   it("formats dates correctly and handles null endDate as Present", () => {
-    const data: ResumeSourceData = {
+    const data: CompilerInput = {
       contact: { fullName: "Test", email: "t@t.com" },
       experiences: [
         {
@@ -197,7 +193,7 @@ describe("compileResumeSource", () => {
   });
 
   it("renders subsection label with no bullets", () => {
-    const data: ResumeSourceData = {
+    const data: CompilerInput = {
       contact: { fullName: "Test", email: "t@t.com" },
       experiences: [
         {
@@ -216,7 +212,7 @@ describe("compileResumeSource", () => {
   });
 
   it("handles correct heading hierarchy (H2 → H3 → H4)", () => {
-    const data: ResumeSourceData = {
+    const data: CompilerInput = {
       contact: { fullName: "Test", email: "t@t.com" },
       experiences: [
         {
@@ -249,7 +245,7 @@ describe("compileResumeSource", () => {
   });
 
   it("returns empty string when contact has no name", () => {
-    const data: ResumeSourceData = {
+    const data: CompilerInput = {
       contact: { fullName: "", email: "test@test.com" },
       education: [{ institution: "MIT", degree: "BS" }],
     };
@@ -265,7 +261,7 @@ describe("compileResumeSource", () => {
   });
 
   it("handles publication with year-only date", () => {
-    const data: ResumeSourceData = {
+    const data: CompilerInput = {
       contact: { fullName: "Test", email: "t@t.com" },
       publications: [
         { title: "My Paper", publisher: "IEEE", date: "2023" },

@@ -1,7 +1,7 @@
 import { authenticatedHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/prisma";
 
-const fullInclude = {
+export const fullInclude = {
   contact: true,
   education: { orderBy: { sortOrder: "asc" as const } },
   experiences: {
@@ -12,6 +12,7 @@ const fullInclude = {
   },
   skills: { orderBy: { sortOrder: "asc" as const } },
   publications: { orderBy: { sortOrder: "asc" as const } },
+  customSections: { orderBy: { sortOrder: "asc" as const } },
 };
 
 export const GET = authenticatedHandler(async (_request, { userId }) => {

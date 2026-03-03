@@ -129,6 +129,30 @@ export const reorderSchema = z.object({
 });
 export type ReorderInput = z.infer<typeof reorderSchema>;
 
+// Import
+export const importSchema = z.object({
+  markdown: z.string().min(1, "Markdown content is required").max(204800, "File too large (max 200KB)"),
+});
+export type ImportInput = z.infer<typeof importSchema>;
+
+// Custom Section
+export const customSectionCreateSchema = z.object({
+  title: trimmedString(200).min(1, "Title is required"),
+  content: z.string().max(50000).optional().default(""),
+});
+
+export const customSectionUpdateSchema = z.object({
+  title: trimmedString(200).min(1, "Title is required").optional(),
+  content: z.string().max(50000).optional(),
+});
+export type CustomSectionInput = z.infer<typeof customSectionUpdateSchema>;
+
+// Miscellaneous
+export const miscellaneousUpdateSchema = z.object({
+  content: z.string().max(50000).nullable(),
+});
+export type MiscellaneousInput = z.infer<typeof miscellaneousUpdateSchema>;
+
 // Entry caps
 export const ENTRY_CAPS = {
   education: 30,
@@ -136,4 +160,5 @@ export const ENTRY_CAPS = {
   subsections: 20,
   skills: 30,
   publications: 30,
+  customSections: 20,
 } as const;

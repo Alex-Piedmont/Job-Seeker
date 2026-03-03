@@ -64,6 +64,14 @@ export type ResumePublication = {
   sortOrder: number;
 };
 
+export type ResumeCustomSection = {
+  id: string;
+  resumeSourceId: string;
+  title: string;
+  content: string;
+  sortOrder: number;
+};
+
 export type ResumeSourceData = {
   id: string;
   userId: string;
@@ -74,4 +82,6 @@ export type ResumeSourceData = {
   experiences: ResumeWorkExperience[];
   skills: ResumeSkill[];
   publications: ResumePublication[];
+  customSections: ResumeCustomSection[];
+  miscellaneous: string | null;
 };

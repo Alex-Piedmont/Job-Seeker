@@ -16,6 +16,7 @@ export const GET = authenticatedHandler(async (_request, { userId }) => {
       },
       skills: { orderBy: { sortOrder: "asc" } },
       publications: { orderBy: { sortOrder: "asc" } },
+      customSections: { orderBy: { sortOrder: "asc" } },
     },
   });
 
@@ -29,6 +30,8 @@ export const GET = authenticatedHandler(async (_request, { userId }) => {
     experiences: resumeSource.experiences,
     skills: resumeSource.skills,
     publications: resumeSource.publications,
+    customSections: resumeSource.customSections,
+    miscellaneous: resumeSource.miscellaneous,
   });
 
   return Response.json({

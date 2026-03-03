@@ -3,27 +3,12 @@
  * No side effects — takes data, returns string.
  */
 
-const MONTH_NAMES = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-export function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return "Present";
-  // Handle YYYY-only format
-  if (/^\d{4}$/.test(dateStr)) return dateStr;
-  const match = dateStr.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
-  if (!match) return dateStr;
-  const monthIndex = parseInt(match[2], 10) - 1;
-  return `${MONTH_NAMES[monthIndex]} ${match[1]}`;
-}
-
-/** Join non-null/non-empty values with separator, skipping blanks */
-function joinParts(parts: (string | null | undefined)[], sep: string): string {
-  return parts.filter((p) => p && p.trim()).join(sep);
-}
-
-export type ResumeSourceData = {
+/**
+ * Loose input type for the compiler. Accepts partial data so callers
+ * don't need to provide all fields (e.g., id, resumeSourceId).
+ * The canonical ResumeSourceData from types/ satisfies this type.
+ */
+export type CompilerInput = {
   contact?: {
     fullName?: string | null;
     email?: string | null;
@@ -66,9 +51,35 @@ export type ResumeSourceData = {
     url?: string | null;
     description?: string | null;
   }>;
+  customSections?: Array<{
+    title: string;
+    content: string;
+    sortOrder?: number;
+  }>;
+  miscellaneous?: string | null;
 };
 
-export function compileResumeSource(data: ResumeSourceData): string {
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+export function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "Present";
+  // Handle YYYY-only format
+  if (/^\d{4}$/.test(dateStr)) return dateStr;
+  const match = dateStr.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+  if (!match) return dateStr;
+  const monthIndex = parseInt(match[2], 10) - 1;
+  return `${MONTH_NAMES[monthIndex]} ${match[1]}`;
+}
+
+/** Join non-null/non-empty values with separator, skipping blanks */
+function joinParts(parts: (string | null | undefined)[], sep: string): string {
+  return parts.filter((p) => p && p.trim()).join(sep);
+}
+
+export function compileResumeSource(data: CompilerInput): string {
   const sections: string[] = [];
 
   // Contact / Header
@@ -200,6 +211,25 @@ export function compileResumeSource(data: ResumeSourceData): string {
         sections.push(`  ${pub.description.trim()}`);
       }
     }
+  }
+
+  // Custom Sections
+  const customSections = (data.customSections ?? []).filter(
+    (s) => s.title?.trim() && s.content?.trim()
+  );
+  for (const section of customSections) {
+    sections.push("");
+    sections.push(`## ${section.title.trim()}`);
+    sections.push("");
+    sections.push(section.content.trim());
+  }
+
+  // Miscellaneous
+  if (data.miscellaneous?.trim()) {
+    sections.push("");
+    sections.push("## Miscellaneous");
+    sections.push("");
+    sections.push(data.miscellaneous.trim());
   }
 
   return sections.join("\n");

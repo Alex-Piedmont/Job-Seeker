@@ -18,6 +18,7 @@ Your task is to tailor the candidate's resume for a specific job posting. Follow
 5. **Format**: Output clean Markdown matching the input structure (H1 for name, H2 for sections, H3 for entries, bullets for achievements).
 6. **Conciseness**: Aim for a 1-page resume. Be ruthlessly concise — every word must earn its place.
 7. **Professional summary**: Write a 2-3 sentence summary tailored to the target role.
+8. **Custom sections**: Custom sections (e.g., Certifications, Awards, Volunteer Work, Projects) should be included in the output if they are relevant to the target role. Omit them only if they add no value for the specific position.
 
 Output ONLY the tailored resume in Markdown. No commentary, explanations, or notes.`;
 

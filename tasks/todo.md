@@ -293,3 +293,64 @@ PRDs 1-7 fully implemented. 203 tests passing. Production-ready.
 
 ### Verification
 - `npm run build` — succeeds, 0 errors
+
+---
+
+## PRD 8: Markdown Upload & Custom Sections — COMPLETE
+
+- [x] Phase 1: Schema & Parser
+  - [x] Prisma migration — `ResumeCustomSection` model + `miscellaneous` field on `ResumeSource`
+  - [x] Type updates — `ResumeCustomSection` type, extended `ResumeSourceData`
+  - [x] Validation schemas — import, custom section CRUD, miscellaneous
+  - [x] Resume parser (`src/lib/resume-parser.ts`) — full markdown → structured data
+  - [x] Parser unit tests — 39 tests covering all section types, edge cases
+
+- [x] Phase 2: API & Data Flow
+  - [x] `POST /api/resume-source/import` — transactional import with upsert
+  - [x] Custom section CRUD endpoints (POST, PATCH, DELETE, reorder)
+  - [x] `PATCH /api/resume-source/miscellaneous` — update misc content
+  - [x] `GET /api/resume-source` updated with `customSections` include
+  - [x] Compiler updated — `CompilerInput` type (decoupled from canonical type), custom sections + misc output
+  - [x] Resume prompt updated — custom section guidance for AI generation
+  - [x] Helpers updated — `verifyCustomSectionOwnership`, `reorderEntries` union expanded
+  - [x] Compile route & generate route updated to include `customSections` + `miscellaneous`
+
+- [x] Phase 3: UI Components
+  - [x] `upload-dialog.tsx` — file picker, confirmation dialog, import API call
+  - [x] `custom-section-editor.tsx` — inline title edit, content textarea, delete with confirmation
+  - [x] `miscellaneous-editor.tsx` — textarea with auto-save
+  - [x] `section-tabs.tsx` — dynamic built-in + custom + misc tabs, "+" add section button
+  - [x] `preview-panel.tsx` — download button, passes customSections/misc to compiler
+  - [x] `page.tsx` — upload button, custom section rendering, tab routing with `custom:{id}` convention
+
+- [x] Phase 4: Verification
+  - [x] All 245 tests pass (27 test files)
+  - [x] TypeScript: 0 errors (`npx tsc --noEmit`)
+  - [x] Next.js production build: success
+
+### Key Files Created (10)
+- `src/lib/resume-parser.ts` — Pure function: markdown string → ParsedResume
+- `src/lib/__tests__/resume-parser.test.ts` — 39 parser unit tests
+- `src/app/api/resume-source/import/route.ts` — POST: parse + transactional replace
+- `src/app/api/resume-source/custom-sections/route.ts` — POST: create custom section
+- `src/app/api/resume-source/custom-sections/[id]/route.ts` — PATCH/DELETE
+- `src/app/api/resume-source/custom-sections/reorder/route.ts` — PUT: reorder
+- `src/app/api/resume-source/miscellaneous/route.ts` — PATCH: update misc content
+- `src/components/resume-source/upload-dialog.tsx` — Upload button + confirmation
+- `src/components/resume-source/custom-section-editor.tsx` — Markdown editor with inline title
+- `src/components/resume-source/miscellaneous-editor.tsx` — Simple markdown editor
+
+### Key Files Modified (13)
+- `prisma/schema.prisma` — New model + field
+- `src/types/resume-source.ts` — New types
+- `src/lib/validations/resume-source.ts` — New schemas + caps
+- `src/lib/resume-compiler.ts` — `CompilerInput` type, custom sections + misc in output
+- `src/lib/resume-source-helpers.ts` — Ownership helper + reorder union
+- `src/lib/resume-prompt.ts` — Custom section AI guidance
+- `src/components/resume-source/section-tabs.tsx` — Dynamic tabs + "+" button
+- `src/components/resume-source/preview-panel.tsx` — Download button
+- `src/app/(authenticated)/resume-source/page.tsx` — Upload, custom/misc editors
+- `src/app/api/resume-source/route.ts` — `customSections` in include
+- `src/app/api/resume-source/compile/route.ts` — `customSections` in include + compiler call
+- `src/app/api/resume/generate/route.ts` — `customSections` in include + compiler call
+- `src/lib/__tests__/resume-compiler.test.ts` — Updated for `CompilerInput` type

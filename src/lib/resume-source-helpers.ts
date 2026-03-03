@@ -80,10 +80,22 @@ export async function verifyPublicationOwnership(id: string, userId: string) {
 }
 
 /**
+ * Verify a custom section entry belongs to the given user.
+ */
+export async function verifyCustomSectionOwnership(id: string, userId: string) {
+  return prisma.resumeCustomSection.findFirst({
+    where: {
+      id,
+      resumeSource: { userId },
+    },
+  });
+}
+
+/**
  * Generic reorder: updates sortOrder for each id in the array.
  */
 export async function reorderEntries(
-  model: "resumeEducation" | "resumeWorkExperience" | "resumeWorkSubsection" | "resumeSkill" | "resumePublication",
+  model: "resumeEducation" | "resumeWorkExperience" | "resumeWorkSubsection" | "resumeSkill" | "resumePublication" | "resumeCustomSection",
   ids: string[]
 ) {
   await prisma.$transaction(

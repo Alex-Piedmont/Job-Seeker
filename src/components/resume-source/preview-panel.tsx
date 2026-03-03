@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Download } from "lucide-react";
 import { compileResumeSource } from "@/lib/resume-compiler";
 import type { ResumeSourceData } from "@/types/resume-source";
 import { toast } from "sonner";
@@ -24,6 +24,8 @@ export function PreviewPanel({ data }: PreviewPanelProps) {
       experiences: data.experiences,
       skills: data.skills,
       publications: data.publications,
+      customSections: data.customSections,
+      miscellaneous: data.miscellaneous,
     });
   }, [data]);
 
@@ -36,6 +38,18 @@ export function PreviewPanel({ data }: PreviewPanelProps) {
     } catch {
       toast.error("Failed to copy");
     }
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([markdown], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "resume-source.md";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const lastSaved = data?.updatedAt
@@ -53,20 +67,32 @@ export function PreviewPanel({ data }: PreviewPanelProps) {
             </p>
           )}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleCopy}
-          disabled={!markdown}
-          className="gap-1.5"
-        >
-          {copied ? (
-            <Check className="h-3.5 w-3.5" />
-          ) : (
-            <Copy className="h-3.5 w-3.5" />
-          )}
-          {copied ? "Copied" : "Copy Markdown"}
-        </Button>
+        <div className="flex gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownload}
+            disabled={!markdown}
+            className="gap-1.5"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopy}
+            disabled={!markdown}
+            className="gap-1.5"
+          >
+            {copied ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+            {copied ? "Copied" : "Copy Markdown"}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="pt-0">
         {markdown ? (
