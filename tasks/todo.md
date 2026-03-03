@@ -354,3 +354,35 @@ PRDs 1-7 fully implemented. 203 tests passing. Production-ready.
 - `src/app/api/resume-source/compile/route.ts` — `customSections` in include + compiler call
 - `src/app/api/resume/generate/route.ts` — `customSections` in include + compiler call
 - `src/lib/__tests__/resume-compiler.test.ts` — Updated for `CompilerInput` type
+
+---
+
+## PRD 10: User Feedback System — COMPLETE
+
+- [x] Phase 1: Prisma schema — `FeedbackCategory` enum + `Feedback` model + `User.feedback` relation
+- [x] Phase 2: Migration — `add-feedback-model` applied
+- [x] Phase 3: Rate limit — `"feedback"` category (5 req / 600s) in `rate-limit.ts` + `api-handler.ts`
+- [x] Phase 4: Zod validation — `src/lib/validations/feedback.ts`
+- [x] Phase 5: API route — `POST /api/feedback` (authenticated + rate-limited) + `GET /api/feedback` (admin, optional `?category=` filter)
+- [x] Phase 6: `FeedbackButton` component — fixed bottom-left with dialog (category select, textarea, char counter)
+- [x] Phase 7: Added to authenticated layout alongside KofiButton
+- [x] Phase 8: `FeedbackTab` admin component — table with category filter, expandable messages, colored badges
+- [x] Phase 9: Added Feedback tab to admin dashboard (4th tab)
+
+### Key Files Created (4)
+- `src/lib/validations/feedback.ts` — Zod schema for category + message + pageUrl
+- `src/app/api/feedback/route.ts` — POST (authenticated, rate-limited) + GET (admin)
+- `src/components/feedback-dialog.tsx` — FeedbackButton with dialog form
+- `src/components/admin/feedback-tab.tsx` — Admin table with category filter + expand/collapse
+
+### Key Files Modified (5)
+- `prisma/schema.prisma` — FeedbackCategory enum, Feedback model, User.feedback relation
+- `src/lib/rate-limit.ts` — Added "feedback" category
+- `src/lib/api-handler.ts` — Added "feedback" to HandlerOptions union
+- `src/app/(authenticated)/layout.tsx` — Added FeedbackButton
+- `src/app/(authenticated)/admin/page.tsx` — Added Feedback tab
+
+### Verification
+- `npx prisma migrate dev` — succeeded
+- `npm run build` — 0 type errors
+- `npm run test` — 257/257 tests pass (27 test files)

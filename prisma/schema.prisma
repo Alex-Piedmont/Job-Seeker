@@ -12,6 +12,13 @@ enum Role {
   ADMIN
 }
 
+enum FeedbackCategory {
+  BUG
+  SUGGESTION
+  PRAISE
+  OTHER
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -37,6 +44,7 @@ model User {
   jobApplications   JobApplication[]
   resumeSource      ResumeSource?
   resumeGenerations ResumeGeneration[]
+  feedback          Feedback[]
 
   @@index([lastActiveAt])
   @@map("users")
@@ -336,4 +344,21 @@ model ResumeGeneration {
   @@index([jobApplicationId])
   @@index([createdAt])
   @@map("resume_generations")
+}
+
+// ─── Feedback ────────────────────────────────────────────────────────────────
+
+model Feedback {
+  id        String           @id @default(cuid())
+  userId    String
+  category  FeedbackCategory
+  message   String           @db.Text
+  pageUrl   String?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("feedback")
 }
