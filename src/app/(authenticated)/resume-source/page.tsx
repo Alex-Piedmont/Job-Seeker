@@ -8,7 +8,6 @@ import { EducationSection } from "@/components/resume-source/education-section";
 import { ExperienceSection } from "@/components/resume-source/experience-section";
 import { SkillsSection } from "@/components/resume-source/skills-section";
 import { PublicationsSection } from "@/components/resume-source/publications-section";
-import { PreviewPanel } from "@/components/resume-source/preview-panel";
 import { UploadDialog } from "@/components/resume-source/upload-dialog";
 import { CustomSectionEditor } from "@/components/resume-source/custom-section-editor";
 import { MiscellaneousEditor } from "@/components/resume-source/miscellaneous-editor";
@@ -19,7 +18,6 @@ import type { ResumeSourceData, ResumeCustomSection } from "@/types/resume-sourc
 export default function ResumeSourcePage() {
   const { data, isLoading, mutate, refetch } = useResumeSource();
   const [activeTab, setActiveTab] = useState<string>("contact");
-  const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
 
   if (isLoading) {
     return (
@@ -121,38 +119,7 @@ export default function ResumeSourcePage() {
         onAddSection={handleAddSection}
       />
 
-      {/* Mobile toggle */}
-      <div className="flex gap-2 lg:hidden">
-        <button
-          onClick={() => setMobileView("edit")}
-          className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${
-            mobileView === "edit"
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground"
-          }`}
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => setMobileView("preview")}
-          className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${
-            mobileView === "preview"
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground"
-          }`}
-        >
-          Preview
-        </button>
-      </div>
-
-      <div className="flex gap-6">
-        {/* Edit panel */}
-        <div
-          className={`w-full lg:w-[60%] ${
-            mobileView === "preview" ? "hidden lg:block" : ""
-          }`}
-          role="tabpanel"
-        >
+      <div role="tabpanel">
           {activeTab === "contact" && (
             <ContactForm
               contact={data?.contact ?? null}
@@ -206,16 +173,6 @@ export default function ResumeSourcePage() {
               onUpdate={handleMiscUpdate}
             />
           )}
-        </div>
-
-        {/* Preview panel */}
-        <div
-          className={`w-full lg:w-[40%] ${
-            mobileView === "edit" ? "hidden lg:block" : ""
-          }`}
-        >
-          <PreviewPanel data={data} />
-        </div>
       </div>
     </div>
   );
