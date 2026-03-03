@@ -13,7 +13,7 @@ type HandlerFn = (
 ) => Promise<Response | NextResponse>;
 
 type HandlerOptions = {
-  rateLimit?: "resume-generate" | "export" | "api-default" | "feedback";
+  rateLimit?: "resume-generate" | "export" | "api-default" | "feedback" | "fit-analysis" | "resume-review";
 };
 
 /**

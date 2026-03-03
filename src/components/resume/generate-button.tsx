@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -10,6 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ResumeWizard } from "./wizard/resume-wizard";
 
 interface GenerateButtonProps {
   jobApplicationId: string;
@@ -36,9 +37,9 @@ export function GenerateButton({
   onGenerated,
   onUsageChanged,
 }: GenerateButtonProps) {
-  const [loading, setLoading] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
-  const disabled = !hasResumeSource || !hasJobDescription || capReached || loading;
+  const disabled = !hasResumeSource || !hasJobDescription || capReached;
 
   const tooltipText = !hasResumeSource
     ? "Add your resume source first"
@@ -48,63 +49,52 @@ export function GenerateButton({
         ? "Monthly generation limit reached"
         : "Generate a tailored resume using AI";
 
-  const handleGenerate = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/resume/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobApplicationId }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(err.error || "Failed to generate resume");
-        return;
-      }
-
-      const result = await res.json();
-      onGenerated(result);
-      onUsageChanged?.();
-      toast.success("Resume generated successfully");
-    } catch {
-      toast.error("Failed to generate resume");
-    } finally {
-      setLoading(false);
-    }
-  };
+  function handleGenerated(result: {
+    id: string;
+    markdownOutput: string;
+    promptTokens: number;
+    completionTokens: number;
+    estimatedCost: number;
+    modelId: string;
+    createdAt: string;
+  }) {
+    onGenerated(result);
+    toast.success("Resume generated successfully");
+  }
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div>
-            <Button
-              variant="default"
-              className="w-full"
-              disabled={disabled}
-              aria-disabled={disabled}
-              aria-describedby="generate-tooltip"
-              onClick={handleGenerate}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Generate Tailored Resume
-                </>
-              )}
-            </Button>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent id="generate-tooltip">
-          <p>{tooltipText}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              <Button
+                variant="default"
+                className="w-full"
+                disabled={disabled}
+                aria-disabled={disabled}
+                aria-describedby="generate-tooltip"
+                onClick={() => setWizardOpen(true)}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generate Tailored Resume
+              </Button>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent id="generate-tooltip">
+            <p>{tooltipText}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <ResumeWizard
+        jobApplicationId={jobApplicationId}
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        onGenerated={handleGenerated}
+        onUsageChanged={onUsageChanged}
+        capReached={capReached}
+      />
+    </>
   );
 }

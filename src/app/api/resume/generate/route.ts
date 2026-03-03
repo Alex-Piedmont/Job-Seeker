@@ -15,7 +15,13 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
   const validation = await validateBody(request, generateResumeSchema);
   if (!validation.success) return validation.response;
 
-  const { jobApplicationId } = validation.data;
+  const {
+    jobApplicationId,
+    fitAnalysis,
+    userAnswers,
+    parentGenerationId,
+    revisionContext,
+  } = validation.data;
 
   // 2. Verify ownership and JD presence
   const application = await prisma.jobApplication.findFirst({
@@ -81,17 +87,38 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
     );
   }
 
-  // 5. Call Claude — rollback on any failure
+  // 5. Build revision context if parentGenerationId provided
+  let promptRevisionContext: { previousMarkdown: string; reviewFeedback: string; userNotes?: string } | undefined;
+  if (parentGenerationId && revisionContext) {
+    const parent = await prisma.resumeGeneration.findFirst({
+      where: { id: parentGenerationId, userId },
+      select: { markdownOutput: true },
+    });
+    if (parent) {
+      promptRevisionContext = {
+        previousMarkdown: parent.markdownOutput,
+        reviewFeedback: revisionContext.reviewFeedback,
+        userNotes: revisionContext.userNotes,
+      };
+    }
+  }
+
+  // 6. Call Claude — rollback on any failure
   try {
     const { system, user } = buildResumePrompt(
       resumeMarkdown,
-      application.jobDescription
+      application.jobDescription,
+      {
+        fitAnalysis,
+        userAnswers,
+        revisionContext: promptRevisionContext,
+      }
     );
     const result = await generateResume(system, user);
 
     const cost = estimateCost(result.promptTokens, result.completionTokens);
 
-    // 6. Save generation record
+    // 7. Save generation record
     const generation = await prisma.resumeGeneration.create({
       data: {
         userId,
@@ -102,6 +129,9 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
         estimatedCost: cost,
         markdownOutput: result.markdown,
         modelId: result.modelId,
+        fitAnalysisJson: fitAnalysis ?? null,
+        userAnswersJson: userAnswers ? JSON.stringify(userAnswers) : null,
+        parentGenerationId: parentGenerationId ?? null,
       },
     });
 

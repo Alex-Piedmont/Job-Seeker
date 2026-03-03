@@ -44,6 +44,8 @@ model User {
   jobApplications   JobApplication[]
   resumeSource      ResumeSource?
   resumeGenerations ResumeGeneration[]
+  resumeAuxCalls    ResumeAuxCall[]
+  fitAnalysisCaches FitAnalysisCache[]
   feedback          Feedback[]
 
   @@index([lastActiveAt])
@@ -142,6 +144,8 @@ model JobApplication {
   statusLogs          ApplicationStatusLog[]
   notes               ApplicationNote[]
   resumeGenerations   ResumeGeneration[]
+  resumeAuxCalls      ResumeAuxCall[]
+  fitAnalysisCaches   FitAnalysisCache[]
 
   @@unique([userId, serialNumber])
   @@index([columnId])
@@ -326,14 +330,41 @@ model ResumePublication {
 // ─── Resume Generation Models ─────────────────────────────────────────────────
 
 model ResumeGeneration {
+  id                 String   @id @default(cuid())
+  userId             String
+  jobApplicationId   String
+  promptTokens       Int      @default(0)
+  completionTokens   Int      @default(0)
+  totalTokens        Int      @default(0)
+  estimatedCost      Float    @default(0)
+  markdownOutput     String   @db.Text
+  modelId            String
+  reviewJson         String?  @db.Text
+  fitAnalysisJson    String?  @db.Text
+  userAnswersJson    String?  @db.Text
+  parentGenerationId String?
+  createdAt          DateTime @default(now())
+
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobApplication     JobApplication    @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
+  parentGeneration   ResumeGeneration? @relation("RevisionChain", fields: [parentGenerationId], references: [id], onDelete: SetNull)
+  childGenerations   ResumeGeneration[] @relation("RevisionChain")
+
+  @@index([userId])
+  @@index([jobApplicationId])
+  @@index([createdAt])
+  @@map("resume_generations")
+}
+
+model ResumeAuxCall {
   id               String   @id @default(cuid())
   userId           String
   jobApplicationId String
+  callType         String   // "fit_analysis" | "review"
   promptTokens     Int      @default(0)
   completionTokens Int      @default(0)
   totalTokens      Int      @default(0)
   estimatedCost    Float    @default(0)
-  markdownOutput   String   @db.Text
   modelId          String
   createdAt        DateTime @default(now())
 
@@ -342,8 +373,23 @@ model ResumeGeneration {
 
   @@index([userId])
   @@index([jobApplicationId])
-  @@index([createdAt])
-  @@map("resume_generations")
+  @@map("resume_aux_calls")
+}
+
+model FitAnalysisCache {
+  id                 String   @id @default(cuid())
+  userId             String
+  jobApplicationId   String   @unique
+  resumeSourceHash   String
+  jobDescriptionHash String
+  analysisJson       String   @db.Text
+  createdAt          DateTime @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobApplication JobApplication @relation(fields: [jobApplicationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("fit_analysis_cache")
 }
 
 // ─── Feedback ────────────────────────────────────────────────────────────────

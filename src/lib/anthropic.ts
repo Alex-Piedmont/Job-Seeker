@@ -34,6 +34,45 @@ export function estimateCost(
   );
 }
 
+export interface ToolUseResult<T> {
+  data: T;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  modelId: string;
+}
+
+/**
+ * Call Claude with a forced tool_use response for structured output.
+ */
+export async function callWithTool<T>(
+  system: string,
+  userMessage: string,
+  tool: { name: string; description: string; input_schema: { type: "object"; properties: Record<string, unknown>; required: string[] } }
+): Promise<ToolUseResult<T>> {
+  const modelId = getModelId();
+  const anthropic = getClient();
+  const response = await anthropic.messages.create({
+    model: modelId,
+    max_tokens: 4096,
+    system,
+    messages: [{ role: "user", content: userMessage }],
+    tools: [tool],
+    tool_choice: { type: "tool", name: tool.name },
+  });
+  const toolBlock = response.content.find((b) => b.type === "tool_use");
+  if (!toolBlock || toolBlock.type !== "tool_use") {
+    throw new Error("Expected tool_use response from Claude");
+  }
+  return {
+    data: toolBlock.input as T,
+    promptTokens: response.usage.input_tokens,
+    completionTokens: response.usage.output_tokens,
+    totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+    modelId,
+  };
+}
+
 export interface GenerateResumeResult {
   markdown: string;
   promptTokens: number;

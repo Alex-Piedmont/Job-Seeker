@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Clock, FileText } from "lucide-react";
+import { ChevronDown, Clock, FileText, RotateCw } from "lucide-react";
 import { DownloadButton } from "./download-button";
+import { Badge } from "@/components/ui/badge";
 
 interface Generation {
   id: string;
@@ -10,6 +11,7 @@ interface Generation {
   promptTokens: number;
   completionTokens: number;
   estimatedCost: number;
+  parentGenerationId?: string | null;
   createdAt: string;
 }
 
@@ -42,6 +44,7 @@ export function GenerationHistory({
         {generations.map((gen) => {
           const date = new Date(gen.createdAt);
           const isExpanded = expanded === gen.id;
+          const isRevision = !!gen.parentGenerationId;
 
           return (
             <div key={gen.id} className="rounded-md border text-sm">
@@ -53,6 +56,12 @@ export function GenerationHistory({
                 <span>
                   {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
+                {isRevision && (
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                    <RotateCw className="h-2.5 w-2.5 mr-0.5" />
+                    Revision
+                  </Badge>
+                )}
                 <span className="ml-auto text-xs text-muted-foreground">
                   ${gen.estimatedCost.toFixed(4)}
                 </span>

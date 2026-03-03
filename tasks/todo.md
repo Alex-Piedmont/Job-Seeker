@@ -386,3 +386,54 @@ PRDs 1-7 fully implemented. 203 tests passing. Production-ready.
 - `npx prisma migrate dev` — succeeded
 - `npm run build` — 0 type errors
 - `npm run test` — 257/257 tests pass (27 test files)
+
+---
+
+## PRD 9: Guided Resume Generation Wizard — COMPLETE
+
+- [x] Phase 1: Rewrite system prompt — Impact-first bullet pattern, "DO NOT start bullets with action verbs", bullet-count rules (3-4/2-3/1-2/consolidate), title selection, role consolidation, 3-4 sentence summary, extended function signature with `ResumePromptContext`
+- [x] Phase 2: Database migration — Added `reviewJson`, `fitAnalysisJson`, `userAnswersJson`, `parentGenerationId` to `ResumeGeneration`; self-referencing `RevisionChain` relation; created `ResumeAuxCall` model (tracks fit-analysis + review API costs); created `FitAnalysisCache` model (keyed by jobApplicationId + content hashes)
+- [x] Phase 3: Fit analysis API — `callWithTool<T>()` generic in `anthropic.ts`; fit-analysis prompt/tool schema/route with SHA-256 cache invalidation; `"fit-analysis"` + `"resume-review"` rate limit categories; `fitAnalysisSchema` + `reviewResumeSchema` Zod schemas
+- [x] Phase 4: Review API — Review prompt/tool schema with grading rubric (A-F); `POST /api/resume/review` route with `ResumeAuxCall` tracking
+- [x] Phase 5: Extend generate endpoint — `generateResumeSchema` extended with optional `fitAnalysis`, `userAnswers`, `parentGenerationId`, `revisionContext`; prompt builder wires context sections; generation record saves metadata + parent link
+- [x] Phase 6: Wizard modal UI — 3-step dialog (fit analysis → questions → review); `WizardStepIndicator` (numbered circles with connecting lines); `StepFitAnalysis` (auto-fetch + skills badges + relevant roles); `StepQuestions` (sequential Q&A with skip); `StepReview` (two-panel: markdown preview + collapsible scorecard with grade badge, keyword alignment, bullet improvements, gaps); `GenerateButton` opens wizard instead of direct API call
+- [x] Phase 7: Revision loop + history — "Revise" button with notes textarea in step-review; re-generates with `parentGenerationId` + `revisionContext`; auto-reviews new generation; `GenerationHistory` shows "Revision" badge; history API returns `parentGenerationId`
+
+### New Files (15)
+| File | Purpose |
+|------|---------|
+| `src/lib/hash.ts` | SHA-256 hash for cache keys |
+| `src/lib/__tests__/hash.test.ts` | Hash tests (4 tests) |
+| `src/lib/resume-prompts/fit-analysis.ts` | Fit analysis prompt + tool schema + types |
+| `src/lib/resume-prompts/review.ts` | Review prompt + tool schema + types |
+| `src/lib/__tests__/fit-analysis-prompt.test.ts` | Fit analysis prompt tests (4 tests) |
+| `src/lib/__tests__/review-prompt.test.ts` | Review prompt tests (4 tests) |
+| `src/app/api/resume/fit-analysis/route.ts` | Fit analysis endpoint with caching |
+| `src/app/api/resume/fit-analysis/__tests__/route.test.ts` | Fit analysis endpoint tests (7 tests) |
+| `src/app/api/resume/review/route.ts` | Review endpoint |
+| `src/app/api/resume/review/__tests__/route.test.ts` | Review endpoint tests (6 tests) |
+| `src/components/resume/wizard/resume-wizard.tsx` | Wizard Dialog container |
+| `src/components/resume/wizard/wizard-step-indicator.tsx` | Step progress indicator |
+| `src/components/resume/wizard/step-fit-analysis.tsx` | Step 1: fit analysis display |
+| `src/components/resume/wizard/step-questions.tsx` | Step 2: sequential Q&A |
+| `src/components/resume/wizard/step-review.tsx` | Step 3: preview + review + revision |
+
+### Modified Files (10)
+| File | Change |
+|------|--------|
+| `src/lib/resume-prompt.ts` | Impact-first rewrite + context parameter |
+| `src/lib/anthropic.ts` | Added `callWithTool<T>()` |
+| `src/lib/rate-limit.ts` | Added fit-analysis + resume-review categories |
+| `src/lib/api-handler.ts` | Added new rate limit types |
+| `src/lib/validations/resume.ts` | Extended schemas |
+| `prisma/schema.prisma` | New columns + 2 models + relations |
+| `src/app/api/resume/generate/route.ts` | Accepts optional context fields |
+| `src/app/api/resume/history/[appId]/route.ts` | Added parentGenerationId to select |
+| `src/components/resume/generate-button.tsx` | Opens wizard instead of direct API |
+| `src/components/resume/generation-history.tsx` | Revision badge |
+
+### Verification
+- `npx tsc --noEmit` — 0 errors
+- `npx vitest run` — 32 files, 290/290 tests pass (33 new for PRD 9)
+- `npx prisma migrate dev` — `add_wizard_models` migration applied
+- Backward compatible: existing generate API works unchanged with no optional fields

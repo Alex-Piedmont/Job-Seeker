@@ -8,13 +8,15 @@ export interface RateLimitResult {
   resetAt: number;
 }
 
-type RateLimitCategory = "resume-generate" | "export" | "api-default" | "feedback";
+type RateLimitCategory = "resume-generate" | "export" | "api-default" | "feedback" | "fit-analysis" | "resume-review";
 
 const CATEGORY_CONFIG: Record<RateLimitCategory, { requests: number; window: `${number} s` }> = {
   "resume-generate": { requests: 3, window: "60 s" },
   "export": { requests: 1, window: "300 s" },
   "api-default": { requests: 60, window: "60 s" },
   "feedback": { requests: 5, window: "600 s" },
+  "fit-analysis": { requests: 5, window: "60 s" },
+  "resume-review": { requests: 5, window: "60 s" },
 };
 
 let rateLimiters: Map<RateLimitCategory, Ratelimit> | null = null;
