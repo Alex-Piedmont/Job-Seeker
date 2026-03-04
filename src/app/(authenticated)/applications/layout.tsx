@@ -3,5 +3,9 @@ export default function ApplicationsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="max-w-full -mx-4 px-4">{children}</div>;
+  return (
+    <div className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] w-screen px-4">
+      {children}
+    </div>
+  );
 }
