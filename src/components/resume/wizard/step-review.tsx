@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { Loader2, CheckCircle, AlertTriangle, ArrowRight, ChevronRight, ChevronDown } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -55,6 +55,11 @@ export function StepReview({
   const [revising, setRevising] = useState(false);
   const [reviewExpanded, setReviewExpanded] = useState(true);
 
+  const onUsageChangedRef = useRef(onUsageChanged);
+  useEffect(() => {
+    onUsageChangedRef.current = onUsageChanged;
+  }, [onUsageChanged]);
+
   const generateResume = useCallback(async (
     parentGenerationId?: string,
     revisionContext?: { reviewFeedback: string; userNotes?: string }
@@ -86,7 +91,7 @@ export function StepReview({
 
       const result = await res.json();
       setGeneration(result);
-      onUsageChanged?.();
+      onUsageChangedRef.current?.();
 
       // Auto-trigger review
       setReviewing(true);
@@ -117,7 +122,7 @@ export function StepReview({
       setGenerating(false);
       setRevising(false);
     }
-  }, [jobApplicationId, fitAnalysis, userAnswers, onUsageChanged]);
+  }, [jobApplicationId, fitAnalysis, userAnswers]);
 
   useEffect(() => {
     generateResume();
