@@ -10,6 +10,7 @@ import { GenerationHistory } from "@/components/resume/generation-history";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -336,6 +337,24 @@ export function ApplicationDetailDrawer({
         side="right"
         className="w-full sm:w-[60%] sm:max-w-2xl overflow-y-auto"
       >
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            {app ? (
+              <>
+                Application #{app.serialNumber}
+                <Badge variant="outline" className="font-mono">
+                  #{app.serialNumber}
+                </Badge>
+              </>
+            ) : (
+              "Application Details"
+            )}
+          </SheetTitle>
+          <SheetDescription className="sr-only">
+            Application detail panel
+          </SheetDescription>
+        </SheetHeader>
+
         {loading || !app ? (
           <div className="space-y-4 p-4">
             <Skeleton className="h-8 w-48" />
@@ -345,14 +364,6 @@ export function ApplicationDetailDrawer({
           </div>
         ) : (
           <>
-            <SheetHeader>
-              <SheetTitle className="flex items-center gap-2">
-                Application #{app.serialNumber}
-                <Badge variant="outline" className="font-mono">
-                  #{app.serialNumber}
-                </Badge>
-              </SheetTitle>
-            </SheetHeader>
 
             <div className="space-y-4 mt-4">
               {/* Status */}
