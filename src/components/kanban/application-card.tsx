@@ -9,6 +9,7 @@ import {
   getStalenessLevel,
   type StaleCheckInput,
 } from "@/lib/kanban-utils";
+import { GRADE_COLORS } from "@/lib/resume-prompts/review";
 
 export interface ApplicationCardData {
   id: string;
@@ -28,6 +29,7 @@ export interface ApplicationCardData {
   statusLogs: { movedAt: string }[];
   notes: { createdAt: string }[];
   interviews: { createdAt: string }[];
+  resumeGenerations?: { reviewJson: { overallGrade?: string } | null }[];
 }
 
 interface ApplicationCardProps {
@@ -48,6 +50,7 @@ export function ApplicationCard({
 }: ApplicationCardProps) {
   const compensation = getCompensationDisplay(application);
   const interviewCount = application._count.interviews;
+  const resumeGrade = (application.resumeGenerations?.[0]?.reviewJson as { overallGrade?: string } | null)?.overallGrade;
 
   const staleInput: StaleCheckInput = {
     updatedAt: application.updatedAt,
@@ -94,6 +97,11 @@ export function ApplicationCard({
                     No activity for 30+ days. Consider closing this application.
                   </TooltipContent>
                 </Tooltip>
+              )}
+              {resumeGrade && (
+                <span className={`inline-flex items-center justify-center h-5 w-5 rounded text-xs font-bold ${GRADE_COLORS[resumeGrade] || ""}`}>
+                  {resumeGrade}
+                </span>
               )}
               <Badge variant="secondary" className="text-xs font-mono">
                 #{application.serialNumber}

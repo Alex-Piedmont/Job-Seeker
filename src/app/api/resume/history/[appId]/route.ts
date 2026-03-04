@@ -28,6 +28,7 @@ export const GET = authenticatedHandler(async (_request, { userId, params }) => 
       completionTokens: true,
       estimatedCost: true,
       parentGenerationId: true,
+      reviewJson: true,
       createdAt: true,
     },
   });

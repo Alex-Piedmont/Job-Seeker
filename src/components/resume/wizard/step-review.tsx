@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import type { FitAnalysisResult } from "@/lib/resume-prompts/fit-analysis";
-import type { ReviewResult } from "@/lib/resume-prompts/review";
+import { GRADE_COLORS, type ReviewResult } from "@/lib/resume-prompts/review";
 
 interface GenerationResult {
   id: string;
@@ -28,14 +28,6 @@ interface StepReviewProps {
   onUsageChanged?: () => void;
   capReached?: boolean;
 }
-
-const GRADE_COLORS: Record<string, string> = {
-  A: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  B: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  C: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  D: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  F: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-};
 
 export function StepReview({
   jobApplicationId,
@@ -102,6 +94,7 @@ export function StepReview({
           body: JSON.stringify({
             jobApplicationId,
             resumeMarkdown: result.markdownOutput,
+            generationId: result.id,
           }),
         });
 

@@ -17,7 +17,7 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
   const validation = await validateBody(request, reviewResumeSchema);
   if (!validation.success) return validation.response;
 
-  const { jobApplicationId, resumeMarkdown } = validation.data;
+  const { jobApplicationId, resumeMarkdown, generationId } = validation.data;
 
   const application = await prisma.jobApplication.findFirst({
     where: { id: jobApplicationId, userId },
@@ -45,6 +45,14 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
   );
 
   const cost = estimateCost(result.promptTokens, result.completionTokens);
+
+  // Persist review to the generation record
+  if (generationId) {
+    await prisma.resumeGeneration.update({
+      where: { id: generationId, userId },
+      data: { reviewJson: result.data as unknown as Record<string, unknown> },
+    });
+  }
 
   await prisma.resumeAuxCall.create({
     data: {

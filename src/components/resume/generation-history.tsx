@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, Clock, FileText, RotateCw } from "lucide-react";
 import { DownloadButton } from "./download-button";
 import { Badge } from "@/components/ui/badge";
+import { GRADE_COLORS } from "@/lib/resume-prompts/review";
 
 interface Generation {
   id: string;
@@ -12,6 +13,7 @@ interface Generation {
   completionTokens: number;
   estimatedCost: number;
   parentGenerationId?: string | null;
+  reviewJson?: { overallGrade?: string } | null;
   createdAt: string;
 }
 
@@ -45,6 +47,7 @@ export function GenerationHistory({
           const date = new Date(gen.createdAt);
           const isExpanded = expanded === gen.id;
           const isRevision = !!gen.parentGenerationId;
+          const grade = (gen.reviewJson as { overallGrade?: string } | null)?.overallGrade;
 
           return (
             <div key={gen.id} className="rounded-md border text-sm">
@@ -61,6 +64,11 @@ export function GenerationHistory({
                     <RotateCw className="h-2.5 w-2.5 mr-0.5" />
                     Revision
                   </Badge>
+                )}
+                {grade && (
+                  <span className={`inline-flex items-center justify-center h-5 w-5 rounded text-xs font-bold ${GRADE_COLORS[grade] || ""}`}>
+                    {grade}
+                  </span>
                 )}
                 <span className="ml-auto text-xs text-muted-foreground">
                   ${gen.estimatedCost.toFixed(4)}

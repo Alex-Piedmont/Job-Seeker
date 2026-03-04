@@ -23,4 +23,5 @@ export const fitAnalysisSchema = z.object({
 export const reviewResumeSchema = z.object({
   jobApplicationId: z.string().min(1),
   resumeMarkdown: z.string().min(1),
+  generationId: z.string().min(1).optional(),
 });
