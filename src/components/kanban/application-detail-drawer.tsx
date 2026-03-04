@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import { toast } from "sonner";
 import { ChevronDown, Copy, Trash2 } from "lucide-react";
 import { GenerateButton } from "@/components/resume/generate-button";
@@ -134,6 +134,62 @@ export function ApplicationDetailDrawer({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUpdates = useRef<Record<string, unknown>>({});
+
+  // Resizable drawer width
+  const DRAWER_MIN_W = 400;
+  const DRAWER_MAX_W_RATIO = 0.9;
+  const DRAWER_STORAGE_KEY = "drawer-width";
+  const [drawerWidth, setDrawerWidth] = useState<number | null>(null);
+  const isResizing = useRef(false);
+
+  // Load persisted width
+  useLayoutEffect(() => {
+    const stored = localStorage.getItem(DRAWER_STORAGE_KEY);
+    if (stored) {
+      const w = parseInt(stored, 10);
+      if (!isNaN(w)) {
+        setDrawerWidth(Math.min(Math.max(w, DRAWER_MIN_W), window.innerWidth * DRAWER_MAX_W_RATIO));
+        return;
+      }
+    }
+    // Default: 60% of viewport, capped at 672px (max-w-2xl)
+    setDrawerWidth(Math.min(window.innerWidth * 0.6, 672));
+  }, []);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    const startX = e.clientX;
+    const startWidth = drawerWidth ?? 672;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isResizing.current) return;
+      const delta = startX - ev.clientX;
+      const newWidth = Math.min(
+        Math.max(startWidth + delta, DRAWER_MIN_W),
+        window.innerWidth * DRAWER_MAX_W_RATIO
+      );
+      setDrawerWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      isResizing.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      // Persist
+      setDrawerWidth((w) => {
+        if (w) localStorage.setItem(DRAWER_STORAGE_KEY, String(Math.round(w)));
+        return w;
+      });
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [drawerWidth]);
 
   // Resume generation state
   const [hasResumeSource, setHasResumeSource] = useState(false);
@@ -335,8 +391,14 @@ export function ApplicationDetailDrawer({
     <Sheet open={true} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:w-[60%] sm:max-w-2xl overflow-y-auto"
+        className="!w-auto overflow-y-auto"
+        style={{ width: drawerWidth ? `${drawerWidth}px` : undefined }}
       >
+        {/* Resize drag handle */}
+        <div
+          onMouseDown={handleResizeStart}
+          className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
+        />
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             {app ? (
