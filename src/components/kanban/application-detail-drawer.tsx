@@ -391,7 +391,7 @@ export function ApplicationDetailDrawer({
     <Sheet open={true} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="!w-auto !max-w-none !p-0 overflow-hidden !transition-none"
+        className="!max-w-none !p-0 !transition-none"
         style={{ width: drawerWidth ? `${drawerWidth}px` : undefined }}
       >
         {/* Resize drag handle — outside scroll container so overflow doesn't clip it */}
