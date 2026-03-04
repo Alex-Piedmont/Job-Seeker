@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,6 +34,7 @@ import { useAutoSave } from "@/hooks/use-auto-save";
 import { SaveIndicator } from "./save-indicator";
 import { DatePicker } from "./date-picker";
 import { SubsectionForm } from "./subsection-form";
+import { fetchOrThrowSaveError } from "@/lib/fetch-with-save-error";
 import type { ResumeWorkExperience, ResumeWorkSubsection } from "@/types/resume-source";
 import { toast } from "sonner";
 
@@ -66,7 +67,7 @@ function ExperienceCard({
 
   const saveEntry = useCallback(
     async (data: ResumeWorkExperience) => {
-      const res = await fetch(`/api/resume-source/experience/${data.id}`, {
+      const res = await fetchOrThrowSaveError(`/api/resume-source/experience/${data.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -79,17 +80,22 @@ function ExperienceCard({
           alternateTitles: data.alternateTitles ?? [],
         }),
       });
-      if (!res.ok) {
-        toast.error("Failed to save. Please try again.");
-        throw new Error("Save failed");
-      }
       const saved = await res.json();
       onSaved({ ...saved, subsections: data.subsections });
     },
     [onSaved]
   );
 
-  const { status, trigger } = useAutoSave({ onSave: saveEntry });
+  const entryWithDefaults = { ...entry, alternateTitles: entry.alternateTitles ?? [] };
+
+  const { status, trigger, flush } = useAutoSave({
+    onSave: saveEntry,
+    initialData: entryWithDefaults,
+    onRollback: (lastSaved) =>
+      setFields((prev) => ({ ...lastSaved, subsections: prev.subsections })),
+  });
+
+  useEffect(() => () => flush(), [flush]);
 
   const handleChange = (
     field: keyof ResumeWorkExperience,
@@ -148,6 +154,7 @@ function ExperienceCard({
 
   const handleSubsectionDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
+    const previousSubsections = [...fields.subsections];
     const items = Array.from(fields.subsections);
     const [removed] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, removed);
@@ -156,14 +163,21 @@ function ExperienceCard({
     setFields(updated);
     onSaved(updated);
 
-    await fetch(
-      `/api/resume-source/experience/${entry.id}/subsection/reorder`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: reordered.map((s) => s.id) }),
-      }
-    );
+    try {
+      await fetchOrThrowSaveError(
+        `/api/resume-source/experience/${entry.id}/subsection/reorder`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: reordered.map((s) => s.id) }),
+        }
+      );
+    } catch {
+      toast.error("Failed to reorder subsections. Reverting.");
+      const reverted = { ...fields, subsections: previousSubsections };
+      setFields(reverted);
+      onSaved(reverted);
+    }
   };
 
   const displayTitle = fields.title || "New Experience";
@@ -526,17 +540,23 @@ export function ExperienceSection({
 
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
+    const previousOrder = [...experiences];
     const items = Array.from(experiences);
     const [removed] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, removed);
     const reordered = items.map((item, i) => ({ ...item, sortOrder: i }));
     onUpdate(reordered);
 
-    await fetch("/api/resume-source/experience/reorder", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: reordered.map((e) => e.id) }),
-    });
+    try {
+      await fetchOrThrowSaveError("/api/resume-source/experience/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: reordered.map((e) => e.id) }),
+      });
+    } catch {
+      toast.error("Failed to reorder. Reverting.");
+      onUpdate(previousOrder);
+    }
   };
 
   return (

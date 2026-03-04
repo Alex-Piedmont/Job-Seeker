@@ -6,8 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { SaveIndicator } from "./save-indicator";
+import { fetchOrThrowSaveError } from "@/lib/fetch-with-save-error";
 import type { ResumeContact } from "@/types/resume-source";
-import { toast } from "sonner";
 
 type ContactFormProps = {
   contact: ResumeContact | null;
@@ -47,7 +47,7 @@ export function ContactForm({ contact, onUpdate }: ContactFormProps) {
 
   const saveContact = useCallback(
     async (data: ContactFields) => {
-      const res = await fetch("/api/resume-source/contact", {
+      const res = await fetchOrThrowSaveError("/api/resume-source/contact", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -60,17 +60,17 @@ export function ContactForm({ contact, onUpdate }: ContactFormProps) {
           summary: data.summary || null,
         }),
       });
-      if (!res.ok) {
-        toast.error("Failed to save contact. Please try again.");
-        throw new Error("Save failed");
-      }
       const saved = await res.json();
       onUpdate(saved);
     },
     [onUpdate]
   );
 
-  const { status, trigger, flush } = useAutoSave({ onSave: saveContact });
+  const { status, trigger, flush } = useAutoSave({
+    onSave: saveContact,
+    initialData: contactToFields(contact),
+    onRollback: (lastSaved) => setFields(lastSaved),
+  });
 
   const handleChange = (field: keyof ContactFields, value: string) => {
     const updated = { ...fields, [field]: value };

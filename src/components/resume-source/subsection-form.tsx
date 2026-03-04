@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { SaveIndicator } from "./save-indicator";
+import { fetchOrThrowSaveError } from "@/lib/fetch-with-save-error";
 import { Trash2, Plus, X, GripVertical, ChevronRight } from "lucide-react";
 import {
   Dialog,
@@ -18,7 +19,6 @@ import {
 } from "@/components/ui/dialog";
 import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import type { ResumeWorkSubsection } from "@/types/resume-source";
-import { toast } from "sonner";
 
 type SubsectionFormProps = {
   subsection: ResumeWorkSubsection;
@@ -42,7 +42,7 @@ export function SubsectionForm({
 
   const saveSubsection = useCallback(
     async (data: { label: string; bullets: string[] }) => {
-      const res = await fetch(
+      const res = await fetchOrThrowSaveError(
         `/api/resume-source/experience/${experienceId}/subsection/${subsection.id}`,
         {
           method: "PUT",
@@ -50,19 +50,31 @@ export function SubsectionForm({
           body: JSON.stringify(data),
         }
       );
-      if (!res.ok) {
-        toast.error("Failed to save subsection.");
-        throw new Error("Save failed");
-      }
       const saved = await res.json();
       onSaved(saved);
     },
     [experienceId, subsection.id, onSaved]
   );
 
-  const { status, trigger } = useAutoSave({ onSave: saveSubsection });
+  const { status, trigger, flush } = useAutoSave({
+    onSave: saveSubsection,
+    initialData: { label: subsection.label, bullets: subsection.bullets },
+    onRollback: (lastSaved) => {
+      setLabel(lastSaved.label);
+      setBullets(lastSaved.bullets);
+    },
+  });
 
-  const handleBlur = () => trigger({ label, bullets });
+  useEffect(() => () => flush(), [flush]);
+
+  const labelRef = useRef(label);
+  const bulletsRef = useRef(bullets);
+  useEffect(() => { labelRef.current = label; }, [label]);
+  useEffect(() => { bulletsRef.current = bullets; }, [bullets]);
+
+  const handleBlur = useCallback(() => {
+    trigger({ label: labelRef.current, bullets: bulletsRef.current });
+  }, [trigger]);
 
   const autoResizeTextarea = (el: HTMLTextAreaElement) => {
     el.style.height = "auto";

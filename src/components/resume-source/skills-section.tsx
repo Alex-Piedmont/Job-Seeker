@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { GripVertical, Trash2, Plus, X } from "lucide-react";
+import { fetchOrThrowSaveError } from "@/lib/fetch-with-save-error";
 import type { ResumeSkill } from "@/types/resume-source";
 import { toast } from "sonner";
 
@@ -200,17 +201,23 @@ export function SkillsSection({ skills, onUpdate }: SkillsSectionProps) {
 
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
+    const previousOrder = [...skills];
     const items = Array.from(skills);
     const [removed] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, removed);
     const reordered = items.map((item, i) => ({ ...item, sortOrder: i }));
     onUpdate(reordered);
 
-    await fetch("/api/resume-source/skills/reorder", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: reordered.map((s) => s.id) }),
-    });
+    try {
+      await fetchOrThrowSaveError("/api/resume-source/skills/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: reordered.map((s) => s.id) }),
+      });
+    } catch {
+      toast.error("Failed to reorder. Reverting.");
+      onUpdate(previousOrder);
+    }
   };
 
   return (

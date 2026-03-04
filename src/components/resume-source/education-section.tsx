@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,7 @@ import { GripVertical, ChevronDown, ChevronRight, Trash2, Plus, ChevronsUpDown }
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { SaveIndicator } from "./save-indicator";
 import { DatePicker } from "./date-picker";
+import { fetchOrThrowSaveError } from "@/lib/fetch-with-save-error";
 import type { ResumeEducation } from "@/types/resume-source";
 import { toast } from "sonner";
 
@@ -47,7 +48,7 @@ function EducationCard({
 
   const saveEntry = useCallback(
     async (data: ResumeEducation) => {
-      const res = await fetch(`/api/resume-source/education/${data.id}`, {
+      const res = await fetchOrThrowSaveError(`/api/resume-source/education/${data.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -61,17 +62,19 @@ function EducationCard({
           notes: data.notes || null,
         }),
       });
-      if (!res.ok) {
-        toast.error("Failed to save. Please try again.");
-        throw new Error("Save failed");
-      }
       const saved = await res.json();
       onSaved(saved);
     },
     [onSaved]
   );
 
-  const { status, trigger } = useAutoSave({ onSave: saveEntry });
+  const { status, trigger, flush } = useAutoSave({
+    onSave: saveEntry,
+    initialData: entry,
+    onRollback: (lastSaved) => setFields(lastSaved),
+  });
+
+  useEffect(() => () => flush(), [flush]);
 
   const handleChange = (field: keyof ResumeEducation, value: string | null) => {
     const updated = { ...fields, [field]: value };
@@ -277,17 +280,23 @@ export function EducationSection({ education, onUpdate }: EducationSectionProps)
 
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
+    const previousOrder = [...education];
     const items = Array.from(education);
     const [removed] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, removed);
     const reordered = items.map((item, i) => ({ ...item, sortOrder: i }));
     onUpdate(reordered);
 
-    await fetch("/api/resume-source/education/reorder", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: reordered.map((e) => e.id) }),
-    });
+    try {
+      await fetchOrThrowSaveError("/api/resume-source/education/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: reordered.map((e) => e.id) }),
+      });
+    } catch {
+      toast.error("Failed to reorder. Reverting.");
+      onUpdate(previousOrder);
+    }
   };
 
   return (
