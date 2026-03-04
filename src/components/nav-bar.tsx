@@ -20,7 +20,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { Menu, LogOut, Download } from "lucide-react";
+import { Menu, LogOut, Download, Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 import { UsageBadge } from "@/components/resume/usage-badge";
 
 const navLinks = [
@@ -33,6 +34,7 @@ const navLinks = [
 export function NavBar() {
   const { data: session } = useSession();
   const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
 
   if (!session?.user) return null;
 
@@ -77,6 +79,18 @@ export function NavBar() {
           <div className="hidden md:block">
             <UsageBadge />
           </div>
+
+          {/* Theme toggle */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="h-8 w-8 p-0"
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+          </Button>
 
           {/* User dropdown (desktop) */}
           <DropdownMenu>
@@ -140,6 +154,15 @@ export function NavBar() {
                   <UsageBadge />
                 </div>
                 <Separator className="my-2" />
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                >
+                  <Sun className="mr-2 h-4 w-4 dark:hidden" />
+                  <Moon className="mr-2 hidden h-4 w-4 dark:block" />
+                  Toggle theme
+                </Button>
                 <Button
                   variant="ghost"
                   className="w-full justify-start"
