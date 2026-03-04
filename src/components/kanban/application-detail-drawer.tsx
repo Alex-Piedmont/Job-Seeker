@@ -391,16 +391,17 @@ export function ApplicationDetailDrawer({
     <Sheet open={true} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="!w-auto !max-w-none overflow-y-auto !transition-none"
+        className="!w-auto !max-w-none !p-0 overflow-hidden !transition-none"
         style={{ width: drawerWidth ? `${drawerWidth}px` : undefined }}
       >
-        {/* Resize drag handle */}
+        {/* Resize drag handle — outside scroll container so overflow doesn't clip it */}
         <div
           onMouseDown={handleResizeStart}
           className="absolute -left-1 top-0 bottom-0 w-3 cursor-col-resize group z-50"
         >
           <div className="absolute left-1 top-0 bottom-0 w-1 rounded-full group-hover:bg-primary/40 group-active:bg-primary/60 transition-colors" />
         </div>
+        <div className="overflow-y-auto h-full flex flex-col gap-4 p-4 pt-6">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             {app ? (
@@ -861,6 +862,7 @@ export function ApplicationDetailDrawer({
             </div>
           </>
         )}
+        </div>
       </SheetContent>
     </Sheet>
   );
