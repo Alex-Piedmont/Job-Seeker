@@ -391,7 +391,7 @@ export function ApplicationDetailDrawer({
     <Sheet open={true} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="!w-auto overflow-y-auto !transition-none"
+        className="!w-auto !max-w-none overflow-y-auto !transition-none"
         style={{ width: drawerWidth ? `${drawerWidth}px` : undefined }}
       >
         {/* Resize drag handle */}
