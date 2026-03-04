@@ -40,7 +40,7 @@ export function StepFitAnalysis({
         if (!cancelled) {
           setAnalysis(data.analysis);
           // Auto-advance if no questions
-          if (data.analysis.questions.length === 0) {
+          if ((data.analysis.questions ?? []).length === 0) {
             onComplete(data.analysis);
           }
         }
@@ -84,14 +84,20 @@ export function StepFitAnalysis({
 
   if (!analysis) return null;
 
+  const roles = analysis.relevantRoles ?? [];
+  const skills = analysis.skillsMatch ?? { strong: [], partial: [], missing: [] };
+  const wins = analysis.alignedWins ?? [];
+  const gaps = analysis.gaps ?? [];
+  const titles = analysis.titleRecommendations ?? [];
+
   return (
     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
       {/* Relevant Roles */}
-      {analysis.relevantRoles.length > 0 && (
+      {roles.length > 0 && (
         <div className="space-y-1.5">
           <h4 className="text-sm font-medium">Relevant Experience</h4>
           <div className="space-y-1">
-            {analysis.relevantRoles.map((role, i) => (
+            {roles.map((role, i) => (
               <div key={i} className="text-sm rounded-md border p-2">
                 <span className="font-medium">{role.title}</span>
                 <span className="text-muted-foreground"> at {role.company}</span>
@@ -106,18 +112,18 @@ export function StepFitAnalysis({
       <div className="space-y-1.5">
         <h4 className="text-sm font-medium">Skills Match</h4>
         <div className="flex flex-wrap gap-1.5">
-          {analysis.skillsMatch.strong.map((s) => (
+          {(skills.strong ?? []).map((s) => (
             <Badge key={s} variant="default" className="text-xs">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               {s}
             </Badge>
           ))}
-          {analysis.skillsMatch.partial.map((s) => (
+          {(skills.partial ?? []).map((s) => (
             <Badge key={s} variant="secondary" className="text-xs">
               {s}
             </Badge>
           ))}
-          {analysis.skillsMatch.missing.map((s) => (
+          {(skills.missing ?? []).map((s) => (
             <Badge key={s} variant="outline" className="text-xs text-muted-foreground">
               {s}
             </Badge>
@@ -126,11 +132,11 @@ export function StepFitAnalysis({
       </div>
 
       {/* Aligned Wins */}
-      {analysis.alignedWins.length > 0 && (
+      {wins.length > 0 && (
         <div className="space-y-1.5">
           <h4 className="text-sm font-medium">Aligned Wins</h4>
           <ul className="text-sm space-y-0.5 list-disc pl-4">
-            {analysis.alignedWins.map((win, i) => (
+            {wins.map((win, i) => (
               <li key={i} className="text-muted-foreground">{win}</li>
             ))}
           </ul>
@@ -138,11 +144,11 @@ export function StepFitAnalysis({
       )}
 
       {/* Gaps */}
-      {analysis.gaps.length > 0 && (
+      {gaps.length > 0 && (
         <div className="space-y-1.5">
           <h4 className="text-sm font-medium">Gaps to Address</h4>
           <ul className="text-sm space-y-0.5 list-disc pl-4">
-            {analysis.gaps.map((gap, i) => (
+            {gaps.map((gap, i) => (
               <li key={i} className="text-muted-foreground">{gap}</li>
             ))}
           </ul>
@@ -150,11 +156,11 @@ export function StepFitAnalysis({
       )}
 
       {/* Title Recommendations */}
-      {analysis.titleRecommendations.length > 0 && (
+      {titles.length > 0 && (
         <div className="space-y-1.5">
           <h4 className="text-sm font-medium">Recommended Titles</h4>
           <div className="flex flex-wrap gap-1.5">
-            {analysis.titleRecommendations.map((title) => (
+            {titles.map((title) => (
               <Badge key={title} variant="outline" className="text-xs">
                 {title}
               </Badge>
@@ -166,7 +172,7 @@ export function StepFitAnalysis({
       {/* Continue Button */}
       <div className="flex justify-end pt-2">
         <Button onClick={() => onComplete(analysis)}>
-          {analysis.questions.length > 0 ? (
+          {(analysis.questions ?? []).length > 0 ? (
             <>
               Continue
               <ArrowRight className="h-4 w-4 ml-1" />

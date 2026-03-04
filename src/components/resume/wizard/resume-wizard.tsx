@@ -47,7 +47,7 @@ export function ResumeWizard({
 
   const handleFitAnalysisComplete = useCallback((analysis: FitAnalysisResult) => {
     setFitAnalysis(analysis);
-    if (analysis.questions.length > 0) {
+    if ((analysis.questions ?? []).length > 0) {
       setStep(2);
     } else {
       setStep(3);
