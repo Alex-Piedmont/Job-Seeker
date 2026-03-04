@@ -3,12 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { Loader2, CheckCircle, AlertTriangle, ArrowRight, ChevronRight, ChevronDown } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import type { FitAnalysisResult } from "@/lib/resume-prompts/fit-analysis";
 import { GRADE_COLORS, type ReviewResult } from "@/lib/resume-prompts/review";
+
+const DocxPreview = dynamic(
+  () => import("@/components/resume/docx-preview").then((m) => ({ default: m.DocxPreview })),
+  { loading: () => <div className="h-64 animate-pulse bg-muted rounded-md" /> }
+);
 
 interface GenerationResult {
   id: string;
@@ -156,10 +161,8 @@ export function StepReview({
   return (
     <div className="flex flex-col lg:flex-row gap-4 max-h-[70vh]">
       {/* Left: Resume Preview */}
-      <div className="flex-1 min-w-0 overflow-y-auto rounded-md border p-4">
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <ReactMarkdown>{generation.markdownOutput}</ReactMarkdown>
-        </div>
+      <div className="flex-1 min-w-0 overflow-y-auto">
+        <DocxPreview markdown={generation.markdownOutput} className="h-full" />
       </div>
 
       {/* Right: Review Scorecard */}

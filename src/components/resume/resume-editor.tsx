@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
+import dynamic from "next/dynamic";
 import { RotateCcw, Eye, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+
+const DocxPreview = dynamic(
+  () => import("@/components/resume/docx-preview").then((m) => ({ default: m.DocxPreview })),
+  { loading: () => <div className="h-64 animate-pulse bg-muted rounded-md" /> }
+);
 
 interface ResumeEditorProps {
   originalMarkdown: string;
@@ -60,9 +65,7 @@ export function ResumeEditor({
           className="font-mono text-xs"
         />
       ) : (
-        <div className="prose prose-sm dark:prose-invert max-w-none rounded-md border p-4 text-sm">
-          <ReactMarkdown>{editedMarkdown}</ReactMarkdown>
-        </div>
+        <DocxPreview markdown={editedMarkdown} />
       )}
     </div>
   );

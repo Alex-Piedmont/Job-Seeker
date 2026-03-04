@@ -130,14 +130,14 @@ function metaLine(text: string): Paragraph {
 }
 
 /**
- * Convert resume markdown to a .docx buffer.
+ * Build a Document object from resume markdown.
  * Parses line-by-line: H1→name, contact lines, H2→sections, H3→entries, bullets.
+ * Shared by server (toBuffer) and client (toBlob) paths.
  */
-export async function markdownToDocx(markdown: string): Promise<Buffer> {
+export function buildDocument(markdown: string): Document {
   const lines = markdown.split("\n");
   const children: Paragraph[] = [];
 
-  let nameFound = false;
   let afterName = false;
 
   for (const line of lines) {
@@ -162,7 +162,6 @@ export async function markdownToDocx(markdown: string): Promise<Buffer> {
           ],
         })
       );
-      nameFound = true;
       afterName = true;
       continue;
     }
@@ -248,7 +247,7 @@ export async function markdownToDocx(markdown: string): Promise<Buffer> {
     children.push(bodyText(trimmed));
   }
 
-  const doc = new Document({
+  return new Document({
     sections: [
       {
         properties: {
@@ -265,7 +264,13 @@ export async function markdownToDocx(markdown: string): Promise<Buffer> {
       },
     ],
   });
+}
 
+/**
+ * Convert resume markdown to a .docx buffer (server-side).
+ */
+export async function markdownToDocx(markdown: string): Promise<Buffer> {
+  const doc = buildDocument(markdown);
   const buffer = await Packer.toBuffer(doc);
   return Buffer.from(buffer);
 }
