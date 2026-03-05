@@ -207,13 +207,13 @@ export function StepReview({
                 <div className="space-y-1">
                   <h5 className="text-xs font-medium uppercase text-muted-foreground">Keywords</h5>
                   <div className="flex flex-wrap gap-1">
-                    {review.keywordAlignment.matched.map((kw) => (
+                    {(review.keywordAlignment?.matched ?? []).map((kw) => (
                       <Badge key={kw} variant="default" className="text-xs">
                         <CheckCircle className="h-3 w-3 mr-0.5" />
                         {kw}
                       </Badge>
                     ))}
-                    {review.keywordAlignment.missing.map((kw) => (
+                    {(review.keywordAlignment?.missing ?? []).map((kw) => (
                       <Badge key={kw} variant="outline" className="text-xs text-muted-foreground">
                         {kw}
                       </Badge>
@@ -228,7 +228,7 @@ export function StepReview({
                 </div>
 
                 {/* Bullet Improvements */}
-                {review.bulletImprovements.length > 0 && (
+                {Array.isArray(review.bulletImprovements) && review.bulletImprovements.length > 0 && (
                   <div className="space-y-1.5">
                     <h5 className="text-xs font-medium uppercase text-muted-foreground">Bullet Improvements</h5>
                     {review.bulletImprovements.map((bi, i) => (
@@ -245,7 +245,7 @@ export function StepReview({
                 )}
 
                 {/* Gaps */}
-                {review.gapsAndRisks.length > 0 && (
+                {Array.isArray(review.gapsAndRisks) && review.gapsAndRisks.length > 0 && (
                   <div className="space-y-1">
                     <h5 className="text-xs font-medium uppercase text-muted-foreground">Gaps & Risks</h5>
                     <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-3">
