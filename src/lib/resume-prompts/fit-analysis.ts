@@ -29,6 +29,7 @@ Focus on:
 - Gaps that could be addressed with the right framing
 - Which alternate title (if available) best matches the target posting
 - Questions that would help you write a stronger, more targeted resume
+- Company culture fit: if the target company is well-known (e.g., FAANG, major consultancies, Fortune 500), leverage your knowledge of their leadership principles, cultural values, and hiring signals. Flag experiences that align with or could be reframed to reflect these values, and note gaps where the candidate should emphasize different qualities.
 
 Be direct and actionable. Do not pad with generic advice.`;
 
