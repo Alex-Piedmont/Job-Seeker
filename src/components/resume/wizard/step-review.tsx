@@ -111,7 +111,7 @@ export function StepReview({
           setReview(reviewData.review);
         }
       } catch {
-        // Review failure is non-fatal
+        toast.error("Review failed — you can still use the resume.");
       } finally {
         setReviewing(false);
       }

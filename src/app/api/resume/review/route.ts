@@ -51,7 +51,7 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
   if (generationId) {
     await prisma.resumeGeneration.update({
       where: { id: generationId, userId },
-      data: { reviewJson: result.data as unknown as Record<string, unknown> },
+      data: { reviewJson: JSON.stringify(result.data) },
     });
   }
 

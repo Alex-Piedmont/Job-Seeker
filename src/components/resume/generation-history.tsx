@@ -13,7 +13,7 @@ interface Generation {
   completionTokens: number;
   estimatedCost: number;
   parentGenerationId?: string | null;
-  reviewJson?: { overallGrade?: string } | null;
+  reviewJson?: string | null;
   createdAt: string;
 }
 
@@ -47,7 +47,16 @@ export function GenerationHistory({
           const date = new Date(gen.createdAt);
           const isExpanded = expanded === gen.id;
           const isRevision = !!gen.parentGenerationId;
-          const grade = (gen.reviewJson as { overallGrade?: string } | null)?.overallGrade;
+          const grade = (() => {
+            const raw = gen.reviewJson;
+            if (!raw) return undefined;
+            try {
+              const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+              return (parsed as { overallGrade?: string })?.overallGrade;
+            } catch {
+              return undefined;
+            }
+          })();
 
           return (
             <div key={gen.id} className="rounded-md border text-sm">

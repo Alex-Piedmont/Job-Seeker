@@ -29,7 +29,7 @@ export interface ApplicationCardData {
   statusLogs: { movedAt: string }[];
   notes: { createdAt: string }[];
   interviews: { createdAt: string }[];
-  resumeGenerations?: { reviewJson: { overallGrade?: string } | null }[];
+  resumeGenerations?: { reviewJson: string | null }[];
 }
 
 interface ApplicationCardProps {
@@ -50,7 +50,16 @@ export function ApplicationCard({
 }: ApplicationCardProps) {
   const compensation = getCompensationDisplay(application);
   const interviewCount = application._count.interviews;
-  const resumeGrade = (application.resumeGenerations?.[0]?.reviewJson as { overallGrade?: string } | null)?.overallGrade;
+  const resumeGrade = (() => {
+    const raw = application.resumeGenerations?.[0]?.reviewJson;
+    if (!raw) return undefined;
+    try {
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      return (parsed as { overallGrade?: string })?.overallGrade;
+    } catch {
+      return undefined;
+    }
+  })();
 
   const staleInput: StaleCheckInput = {
     updatedAt: application.updatedAt,
