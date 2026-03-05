@@ -48,9 +48,10 @@ export interface ToolUseResult<T> {
 export async function callWithTool<T>(
   system: string,
   userMessage: string,
-  tool: { name: string; description: string; input_schema: { type: "object"; properties: Record<string, unknown>; required: string[] } }
+  tool: { name: string; description: string; input_schema: { type: "object"; properties: Record<string, unknown>; required: string[] } },
+  options?: { model?: string }
 ): Promise<ToolUseResult<T>> {
-  const modelId = getModelId();
+  const modelId = options?.model || getModelId();
   const anthropic = getClient();
   const response = await anthropic.messages.create({
     model: modelId,

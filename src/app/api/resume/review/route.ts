@@ -41,7 +41,8 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
   const result = await callWithTool<ReviewResult>(
     REVIEW_SYSTEM,
     buildReviewUserMessage(resumeMarkdown, application.jobDescription),
-    REVIEW_TOOL
+    REVIEW_TOOL,
+    { model: "claude-haiku-4-5-20251001" }
   );
 
   const cost = estimateCost(result.promptTokens, result.completionTokens);

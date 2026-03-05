@@ -93,11 +93,12 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
     });
   }
 
-  // Call Claude
+  // Call Claude (use Haiku for speed — this is prep work, not final generation)
   const result = await callWithTool<FitAnalysisResult>(
     FIT_ANALYSIS_SYSTEM,
     buildFitAnalysisUserMessage(resumeMarkdown, application.jobDescription),
-    FIT_ANALYSIS_TOOL
+    FIT_ANALYSIS_TOOL,
+    { model: "claude-haiku-4-5-20251001" }
   );
 
   const cost = estimateCost(result.promptTokens, result.completionTokens);
