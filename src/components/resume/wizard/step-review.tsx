@@ -168,14 +168,14 @@ export function StepReview({
   if (!generation) return null;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 max-h-[70vh]">
+    <div className="flex flex-col lg:flex-row gap-4 max-h-[70vh] min-w-0">
       {/* Left: Resume Preview */}
       <div className="flex-1 min-w-0 overflow-y-auto">
         <DocxPreview markdown={generation.markdownOutput} className="h-full" />
       </div>
 
       {/* Right: Review Scorecard */}
-      <div className="w-full lg:w-80 flex-shrink-0 space-y-3 overflow-y-auto">
+      <div className="w-full lg:w-80 flex-shrink-0 space-y-3 overflow-y-auto overflow-x-hidden">
         {reviewing ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -188,8 +188,8 @@ export function StepReview({
               className="flex items-center gap-2 w-full"
               onClick={() => setReviewExpanded(!reviewExpanded)}
             >
-              <span className={`inline-flex items-center justify-center h-8 w-8 rounded-md text-sm font-bold ${GRADE_COLORS[review.overallGrade] || ""}`}>
-                {review.overallGrade}
+              <span className={`inline-flex items-center justify-center h-8 w-8 rounded-md text-sm font-bold ${(review.overallGrade && GRADE_COLORS[review.overallGrade]) || ""}`}>
+                {review.overallGrade ?? "–"}
               </span>
               <span className="text-sm font-medium flex-1 text-left">Review Scorecard</span>
               {reviewExpanded ? (
@@ -201,20 +201,22 @@ export function StepReview({
 
             {reviewExpanded && (
               <div className="space-y-3 text-sm">
-                <p className="text-muted-foreground">{review.gradeJustification}</p>
+                {review.gradeJustification && (
+                  <p className="text-muted-foreground">{review.gradeJustification}</p>
+                )}
 
                 {/* Keywords */}
                 <div className="space-y-1">
                   <h5 className="text-xs font-medium uppercase text-muted-foreground">Keywords</h5>
                   <div className="flex flex-wrap gap-1">
                     {(review.keywordAlignment?.matched ?? []).map((kw) => (
-                      <Badge key={kw} variant="default" className="text-xs">
-                        <CheckCircle className="h-3 w-3 mr-0.5" />
+                      <Badge key={kw} variant="default" className="text-xs max-w-full whitespace-normal break-words">
+                        <CheckCircle className="h-3 w-3 mr-0.5 flex-shrink-0" />
                         {kw}
                       </Badge>
                     ))}
                     {(review.keywordAlignment?.missing ?? []).map((kw) => (
-                      <Badge key={kw} variant="outline" className="text-xs text-muted-foreground">
+                      <Badge key={kw} variant="outline" className="text-xs text-muted-foreground max-w-full whitespace-normal break-words">
                         {kw}
                       </Badge>
                     ))}
@@ -222,10 +224,12 @@ export function StepReview({
                 </div>
 
                 {/* Narrative */}
-                <div className="space-y-1">
-                  <h5 className="text-xs font-medium uppercase text-muted-foreground">Narrative</h5>
-                  <p className="text-muted-foreground">{review.narrativeCoherence}</p>
-                </div>
+                {review.narrativeCoherence && (
+                  <div className="space-y-1">
+                    <h5 className="text-xs font-medium uppercase text-muted-foreground">Narrative</h5>
+                    <p className="text-muted-foreground">{review.narrativeCoherence}</p>
+                  </div>
+                )}
 
                 {/* Bullet Improvements */}
                 {Array.isArray(review.bulletImprovements) && review.bulletImprovements.length > 0 && (

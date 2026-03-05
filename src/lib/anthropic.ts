@@ -49,13 +49,13 @@ export async function callWithTool<T>(
   system: string,
   userMessage: string,
   tool: { name: string; description: string; input_schema: { type: "object"; properties: Record<string, unknown>; required: string[] } },
-  options?: { model?: string }
+  options?: { model?: string; maxTokens?: number }
 ): Promise<ToolUseResult<T>> {
   const modelId = options?.model || getModelId();
   const anthropic = getClient();
   const response = await anthropic.messages.create({
     model: modelId,
-    max_tokens: 4096,
+    max_tokens: options?.maxTokens ?? 4096,
     system,
     messages: [{ role: "user", content: userMessage }],
     tools: [tool],
