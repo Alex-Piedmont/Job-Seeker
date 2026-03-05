@@ -109,6 +109,12 @@ export function StepReview({
         if (reviewRes.ok) {
           const reviewData = await reviewRes.json();
           setReview(reviewData.review);
+        } else {
+          const status = reviewRes.status;
+          const msg = status === 504
+            ? "Review timed out"
+            : `Review failed (${status})`;
+          toast.error(`${msg} — you can still use the resume.`);
         }
       } catch {
         toast.error("Review failed — you can still use the resume.");
