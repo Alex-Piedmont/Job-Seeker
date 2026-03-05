@@ -11,7 +11,7 @@ import {
   type ReviewResult,
 } from "@/lib/resume-prompts/review";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export const POST = authenticatedHandler(async (request, { userId }) => {
   const validation = await validateBody(request, reviewResumeSchema);
