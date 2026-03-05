@@ -28,6 +28,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { InterviewForm } from "./interview-form";
 import { NotesSection } from "./notes-section";
 import { computeOTE, formatCurrency } from "@/lib/kanban-utils";
@@ -132,6 +138,7 @@ export function ApplicationDetailDrawer({
   const [app, setApp] = useState<ApplicationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [answersToShow, setAnswersToShow] = useState<Array<{ question: string; answer: string }> | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUpdates = useRef<Record<string, unknown>>({});
 
@@ -815,6 +822,7 @@ export function ApplicationDetailDrawer({
                       });
                       setEditedMarkdown(gen.markdownOutput);
                     }}
+                    onViewAnswers={setAnswersToShow}
                   />
                 </div>
               </CollapsibleSection>
@@ -864,6 +872,22 @@ export function ApplicationDetailDrawer({
         )}
         </div>
       </SheetContent>
+
+      <Dialog open={!!answersToShow} onOpenChange={(o) => !o && setAnswersToShow(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Answers to Questions</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {answersToShow?.map((qa, i) => (
+              <div key={i} className="space-y-1">
+                <p className="text-sm font-semibold">{qa.question}</p>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{qa.answer}</p>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }

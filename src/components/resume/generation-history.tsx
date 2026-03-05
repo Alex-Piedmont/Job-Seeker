@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Clock, FileText, RotateCw } from "lucide-react";
+import { ChevronDown, Clock, FileText, MessageSquare, RotateCw } from "lucide-react";
 import { DownloadButton } from "./download-button";
 import { Badge } from "@/components/ui/badge";
 import { GRADE_COLORS } from "@/lib/resume-prompts/review";
@@ -14,17 +14,20 @@ interface Generation {
   estimatedCost: number;
   parentGenerationId?: string | null;
   reviewJson?: string | null;
+  userAnswersJson?: string | null;
   createdAt: string;
 }
 
 interface GenerationHistoryProps {
   generations: Generation[];
   onSelect: (generation: Generation) => void;
+  onViewAnswers?: (answers: Array<{ question: string; answer: string }>) => void;
 }
 
 export function GenerationHistory({
   generations,
   onSelect,
+  onViewAnswers,
 }: GenerationHistoryProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -95,6 +98,20 @@ export function GenerationHistory({
                     >
                       View this version
                     </button>
+                    {gen.userAnswersJson && onViewAnswers && (
+                      <button
+                        className="text-xs text-blue-600 hover:underline dark:text-blue-400 inline-flex items-center gap-0.5"
+                        onClick={() => {
+                          try {
+                            const answers = JSON.parse(gen.userAnswersJson!);
+                            onViewAnswers(answers);
+                          } catch { /* malformed JSON */ }
+                        }}
+                      >
+                        <MessageSquare className="h-3 w-3" />
+                        View Answers
+                      </button>
+                    )}
                     <DownloadButton generationId={gen.id} size="sm" />
                   </div>
                   <div className="text-xs text-muted-foreground">
