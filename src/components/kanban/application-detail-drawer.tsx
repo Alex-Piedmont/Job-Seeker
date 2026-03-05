@@ -37,6 +37,8 @@ import {
 import { InterviewForm } from "./interview-form";
 import { NotesSection } from "./notes-section";
 import { computeOTE, formatCurrency } from "@/lib/kanban-utils";
+import { GRADE_COLORS, type ReviewResult } from "@/lib/resume-prompts/review";
+import { CheckCircle, ArrowRight } from "lucide-react";
 
 interface Column {
   id: string;
@@ -139,6 +141,7 @@ export function ApplicationDetailDrawer({
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [answersToShow, setAnswersToShow] = useState<Array<{ question: string; answer: string }> | null>(null);
+  const [reviewToShow, setReviewToShow] = useState<ReviewResult | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUpdates = useRef<Record<string, unknown>>({});
 
@@ -823,6 +826,7 @@ export function ApplicationDetailDrawer({
                       setEditedMarkdown(gen.markdownOutput);
                     }}
                     onViewAnswers={setAnswersToShow}
+                    onViewReview={setReviewToShow}
                   />
                 </div>
               </CollapsibleSection>
@@ -886,6 +890,75 @@ export function ApplicationDetailDrawer({
               </div>
             ))}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!reviewToShow} onOpenChange={(o) => !o && setReviewToShow(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Review Scorecard
+              {reviewToShow && (
+                <span className={`inline-flex items-center justify-center h-7 w-7 rounded-md text-sm font-bold ${GRADE_COLORS[reviewToShow.overallGrade] || ""}`}>
+                  {reviewToShow.overallGrade}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {reviewToShow && (
+            <div className="space-y-4 text-sm">
+              <p className="text-muted-foreground">{reviewToShow.gradeJustification}</p>
+
+              <div className="space-y-1">
+                <h5 className="text-xs font-medium uppercase text-muted-foreground">Keywords</h5>
+                <div className="flex flex-wrap gap-1">
+                  {(reviewToShow.keywordAlignment?.matched ?? []).map((kw) => (
+                    <Badge key={kw} variant="default" className="text-xs">
+                      <CheckCircle className="h-3 w-3 mr-0.5" />
+                      {kw}
+                    </Badge>
+                  ))}
+                  {(reviewToShow.keywordAlignment?.missing ?? []).map((kw) => (
+                    <Badge key={kw} variant="outline" className="text-xs text-muted-foreground">
+                      {kw}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <h5 className="text-xs font-medium uppercase text-muted-foreground">Narrative</h5>
+                <p className="text-muted-foreground">{reviewToShow.narrativeCoherence}</p>
+              </div>
+
+              {Array.isArray(reviewToShow.bulletImprovements) && reviewToShow.bulletImprovements.length > 0 && (
+                <div className="space-y-1.5">
+                  <h5 className="text-xs font-medium uppercase text-muted-foreground">Bullet Improvements</h5>
+                  {reviewToShow.bulletImprovements.map((bi, i) => (
+                    <div key={i} className="rounded-md border p-2 space-y-1">
+                      <p className="text-xs line-through text-muted-foreground">{bi.original}</p>
+                      <div className="flex items-start gap-1">
+                        <ArrowRight className="h-3 w-3 mt-0.5 text-primary flex-shrink-0" />
+                        <p className="text-xs">{bi.suggested}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground italic">{bi.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {Array.isArray(reviewToShow.gapsAndRisks) && reviewToShow.gapsAndRisks.length > 0 && (
+                <div className="space-y-1">
+                  <h5 className="text-xs font-medium uppercase text-muted-foreground">Gaps & Risks</h5>
+                  <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-3">
+                    {reviewToShow.gapsAndRisks.map((gap, i) => (
+                      <li key={i}>{gap}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </Sheet>

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Clock, FileText, MessageSquare, RotateCw } from "lucide-react";
+import { ChevronDown, ClipboardCheck, Clock, FileText, MessageSquare, RotateCw } from "lucide-react";
 import { DownloadButton } from "./download-button";
 import { Badge } from "@/components/ui/badge";
-import { GRADE_COLORS } from "@/lib/resume-prompts/review";
+import { Button } from "@/components/ui/button";
+import { GRADE_COLORS, type ReviewResult } from "@/lib/resume-prompts/review";
 
 interface Generation {
   id: string;
@@ -22,12 +23,14 @@ interface GenerationHistoryProps {
   generations: Generation[];
   onSelect: (generation: Generation) => void;
   onViewAnswers?: (answers: Array<{ question: string; answer: string }>) => void;
+  onViewReview?: (review: ReviewResult) => void;
 }
 
 export function GenerationHistory({
   generations,
   onSelect,
   onViewAnswers,
+  onViewReview,
 }: GenerationHistoryProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -91,16 +94,19 @@ export function GenerationHistory({
               </button>
               {isExpanded && (
                 <div className="border-t p-2 space-y-2">
-                  <div className="flex gap-2">
-                    <button
-                      className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => onSelect(gen)}
                     >
+                      <FileText className="h-3 w-3 mr-1" />
                       View this version
-                    </button>
+                    </Button>
                     {gen.userAnswersJson && onViewAnswers && (
-                      <button
-                        className="text-xs text-blue-600 hover:underline dark:text-blue-400 inline-flex items-center gap-0.5"
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           try {
                             const answers = JSON.parse(gen.userAnswersJson!);
@@ -108,9 +114,26 @@ export function GenerationHistory({
                           } catch { /* malformed JSON */ }
                         }}
                       >
-                        <MessageSquare className="h-3 w-3" />
+                        <MessageSquare className="h-3 w-3 mr-1" />
                         View Answers
-                      </button>
+                      </Button>
+                    )}
+                    {gen.reviewJson && onViewReview && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          try {
+                            const parsed = typeof gen.reviewJson === "string"
+                              ? JSON.parse(gen.reviewJson)
+                              : gen.reviewJson;
+                            onViewReview(parsed as ReviewResult);
+                          } catch { /* malformed JSON */ }
+                        }}
+                      >
+                        <ClipboardCheck className="h-3 w-3 mr-1" />
+                        View Review
+                      </Button>
                     )}
                     <DownloadButton generationId={gen.id} size="sm" />
                   </div>
