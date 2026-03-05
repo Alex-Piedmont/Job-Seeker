@@ -78,7 +78,7 @@ export function ResumeWizard({
     onOpenChange(isOpen);
   }
 
-  const dialogWidth = step === 3 ? "sm:!max-w-5xl" : "sm:!max-w-2xl";
+  const dialogWidth = step === 3 ? "sm:!max-w-[90vw] lg:!max-w-7xl" : "sm:!max-w-2xl";
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
