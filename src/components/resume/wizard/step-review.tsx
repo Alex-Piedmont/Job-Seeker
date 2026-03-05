@@ -82,7 +82,10 @@ export function StepReview({
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        if (res.status === 504) {
+          throw new Error("Generation timed out. Please try again.");
+        }
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Failed to generate resume");
       }
 

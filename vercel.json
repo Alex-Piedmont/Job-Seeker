@@ -3,6 +3,12 @@
   "functions": {
     "src/app/api/resume/generate/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/resume/fit-analysis/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/resume/review/route.ts": {
+      "maxDuration": 60
     }
   }
 }

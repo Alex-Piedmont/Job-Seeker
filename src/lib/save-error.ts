@@ -8,6 +8,6 @@ export class SaveError extends Error {
   }
 
   get isRetryable(): boolean {
-    return this.status === 0 || this.status === 500 || this.status === 502 || this.status === 503;
+    return this.status === 0 || this.status === 500 || this.status === 502 || this.status === 503 || this.status === 504;
   }
 }

@@ -32,7 +32,10 @@ export function StepFitAnalysis({
         });
 
         if (!res.ok) {
-          const err = await res.json();
+          if (res.status === 504) {
+            throw new Error("Analysis timed out. Please try again.");
+          }
+          const err = await res.json().catch(() => ({}));
           throw new Error(err.error || "Failed to analyze fit");
         }
 
