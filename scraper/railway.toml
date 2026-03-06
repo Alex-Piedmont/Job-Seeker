@@ -1,0 +1,8 @@
+[deploy]
+startCommand = "node scraper/dist/index.js"
+
+[[cron]]
+schedule = "0 13 * * *"
+
+[[cron]]
+schedule = "0 4 * * *"

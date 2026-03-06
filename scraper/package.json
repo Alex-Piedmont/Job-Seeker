@@ -1,0 +1,23 @@
+{
+  "name": "job-scraper",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.4.2",
+    "@prisma/client": "^7.4.2",
+    "dotenv": "^17.3.1",
+    "playwright": "^1.58.2",
+    "turndown": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/turndown": "^5.0.5",
+    "tsx": "^4.19.4",
+    "typescript": "^5"
+  }
+}

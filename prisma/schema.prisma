@@ -19,6 +19,20 @@ enum FeedbackCategory {
   OTHER
 }
 
+enum AtsPlatform {
+  GREENHOUSE
+  LEVER
+  WORKDAY
+  ICIMS
+}
+
+enum ScrapeStatus {
+  SUCCESS
+  PARTIAL_FAILURE
+  FAILURE
+  PENDING
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -47,6 +61,7 @@ model User {
   resumeAuxCalls    ResumeAuxCall[]
   fitAnalysisCaches FitAnalysisCache[]
   feedback          Feedback[]
+  userJobArchives   UserJobArchive[]
 
   @@index([lastActiveAt])
   @@map("users")
@@ -407,4 +422,68 @@ model Feedback {
   @@index([userId])
   @@index([createdAt])
   @@map("feedback")
+}
+
+// ─── Job Scraper Models ───────────────────────────────────────────────────────
+
+model Company {
+  id            String        @id @default(cuid())
+  name          String        @unique
+  atsPlatform   AtsPlatform
+  baseUrl       String
+  enabled       Boolean       @default(true)
+  lastScrapeAt  DateTime?
+  scrapeStatus  ScrapeStatus  @default(PENDING)
+  scrapeError   String?       @db.Text
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  scrapedJobs ScrapedJob[]
+
+  @@index([enabled])
+  @@map("companies")
+}
+
+model ScrapedJob {
+  id                String    @id @default(cuid())
+  companyId         String
+  externalJobId     String
+  title             String
+  url               String
+  department        String?
+  locations         Json      @default("[]")
+  locationType      String?
+  salaryMin         Int?
+  salaryMax         Int?
+  salaryCurrency    String    @default("USD")
+  jobDescriptionMd  String    @db.Text
+  firstSeenAt       DateTime  @default(now())
+  lastSeenAt        DateTime  @default(now())
+  removedAt         DateTime?
+  archivedAt        DateTime?
+
+  company       Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userArchives  UserJobArchive[]
+
+  @@unique([companyId, externalJobId])
+  @@index([companyId])
+  @@index([removedAt])
+  @@index([archivedAt])
+  @@index([firstSeenAt])
+  @@map("scraped_jobs")
+}
+
+model UserJobArchive {
+  id           String   @id @default(cuid())
+  userId       String
+  scrapedJobId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scrapedJob ScrapedJob @relation(fields: [scrapedJobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scrapedJobId])
+  @@index([userId])
+  @@index([scrapedJobId])
+  @@map("user_job_archives")
 }
