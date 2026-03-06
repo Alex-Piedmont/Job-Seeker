@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, AlertTriangle, ArrowRight, ChevronRight, ChevronDown } from "lucide-react";
+import { Loader2, CheckCircle, AlertTriangle, ArrowRight, ChevronRight, ChevronDown, Check, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,15 +47,44 @@ export function StepReview({
   const [generating, setGenerating] = useState(true);
   const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showRevise, setShowRevise] = useState(false);
   const [revisionNotes, setRevisionNotes] = useState("");
   const [revising, setRevising] = useState(false);
   const [reviewExpanded, setReviewExpanded] = useState(true);
+  const [acceptedBullets, setAcceptedBullets] = useState<Set<number>>(new Set());
+  const [rejectedBullets, setRejectedBullets] = useState<Set<number>>(new Set());
 
   const onUsageChangedRef = useRef(onUsageChanged);
   useEffect(() => {
     onUsageChangedRef.current = onUsageChanged;
   }, [onUsageChanged]);
+
+  function toggleAccept(index: number) {
+    setAcceptedBullets((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+    setRejectedBullets((prev) => {
+      const next = new Set(prev);
+      next.delete(index);
+      return next;
+    });
+  }
+
+  function toggleReject(index: number) {
+    setRejectedBullets((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+    setAcceptedBullets((prev) => {
+      const next = new Set(prev);
+      next.delete(index);
+      return next;
+    });
+  }
 
   const generateResume = useCallback(async (
     parentGenerationId?: string,
@@ -64,7 +93,8 @@ export function StepReview({
     setGenerating(true);
     setReview(null);
     setError(null);
-    setShowRevise(false);
+    setAcceptedBullets(new Set());
+    setRejectedBullets(new Set());
 
     try {
       const body: Record<string, unknown> = {
@@ -138,8 +168,26 @@ export function StepReview({
   function handleRevise() {
     if (!generation || !review) return;
     setRevising(true);
+
+    const bulletFeedback: string[] = [];
+    if (Array.isArray(review.bulletImprovements)) {
+      review.bulletImprovements.forEach((bi, i) => {
+        if (acceptedBullets.has(i)) {
+          bulletFeedback.push(`APPLY: Replace "${bi.original}" with "${bi.suggested}" (${bi.reason})`);
+        } else if (rejectedBullets.has(i)) {
+          bulletFeedback.push(`KEEP ORIGINAL: "${bi.original}" — user rejected the suggestion`);
+        }
+      });
+    }
+
+    const feedbackParts: string[] = [];
+    if (bulletFeedback.length > 0) {
+      feedbackParts.push("Bullet changes:\n" + bulletFeedback.join("\n"));
+    }
+    feedbackParts.push(JSON.stringify(review));
+
     generateResume(generation.id, {
-      reviewFeedback: JSON.stringify(review),
+      reviewFeedback: feedbackParts.join("\n\n"),
       userNotes: revisionNotes.trim() || undefined,
     });
     setRevisionNotes("");
@@ -236,13 +284,50 @@ export function StepReview({
                   <div className="space-y-1.5">
                     <h5 className="text-xs font-medium uppercase text-muted-foreground">Bullet Improvements</h5>
                     {review.bulletImprovements.map((bi, i) => (
-                      <div key={i} className="rounded-md border p-2 space-y-1">
+                      <div
+                        key={i}
+                        className={`rounded-md border p-2 space-y-1 transition-colors ${
+                          acceptedBullets.has(i)
+                            ? "border-l-2 border-l-green-500 bg-green-50/50 dark:bg-green-950/20"
+                            : rejectedBullets.has(i)
+                              ? "opacity-50"
+                              : ""
+                        }`}
+                      >
                         <p className="text-xs line-through text-muted-foreground">{bi.original}</p>
                         <div className="flex items-start gap-1">
                           <ArrowRight className="h-3 w-3 mt-0.5 text-primary flex-shrink-0" />
                           <p className="text-xs">{bi.suggested}</p>
                         </div>
-                        <p className="text-xs text-muted-foreground italic">{bi.reason}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground italic flex-1">{bi.reason}</p>
+                          <div className="flex gap-1 ml-2 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => toggleAccept(i)}
+                              className={`p-0.5 rounded transition-colors ${
+                                acceptedBullets.has(i)
+                                  ? "text-green-600 bg-green-100 dark:bg-green-900/40"
+                                  : "text-muted-foreground hover:text-green-600"
+                              }`}
+                              title="Accept suggestion"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleReject(i)}
+                              className={`p-0.5 rounded transition-colors ${
+                                rejectedBullets.has(i)
+                                  ? "text-red-600 bg-red-100 dark:bg-red-900/40"
+                                  : "text-muted-foreground hover:text-red-600"
+                              }`}
+                              title="Reject suggestion"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -264,18 +349,37 @@ export function StepReview({
           </>
         ) : null}
 
-        {/* Revision area */}
-        {showRevise && (
-          <div className="space-y-2 pt-2 border-t">
+        {/* Actions */}
+        <div className="flex flex-col gap-2 pt-2 border-t">
+          {review && (
             <Textarea
               value={revisionNotes}
               onChange={(e) => setRevisionNotes(e.target.value)}
-              placeholder="Optional: What should be changed? (max 2000 chars)"
-              className="min-h-20 text-sm"
+              placeholder="Additional revision notes (optional)"
+              className="min-h-16 text-sm"
               maxLength={2000}
             />
+          )}
+
+          {acceptedBullets.size > 0 && (
             <Button
-              size="sm"
+              onClick={handleRevise}
+              disabled={revising || capReached}
+              className="w-full"
+            >
+              {revising ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Applying changes...
+                </>
+              ) : (
+                `Apply ${acceptedBullets.size} Accepted Change${acceptedBullets.size > 1 ? "s" : ""}`
+              )}
+            </Button>
+          )}
+
+          {acceptedBullets.size === 0 && revisionNotes.trim() && review && (
+            <Button
               onClick={handleRevise}
               disabled={revising || capReached}
               className="w-full"
@@ -286,28 +390,21 @@ export function StepReview({
                   Revising...
                 </>
               ) : (
-                "Submit Revision"
+                "Revise with Notes"
               )}
             </Button>
-            {capReached && (
-              <p className="text-xs text-destructive">Generation limit reached</p>
-            )}
-          </div>
-        )}
+          )}
 
-        {/* Actions */}
-        <div className="flex flex-col gap-2 pt-2 border-t">
-          <Button onClick={() => onUseResume(generation)}>
-            Use This Resume
+          <Button
+            variant={acceptedBullets.size > 0 || revisionNotes.trim() ? "outline" : "default"}
+            onClick={() => onUseResume(generation)}
+            className="w-full"
+          >
+            Use As-Is
           </Button>
-          {review && !showRevise && (
-            <Button
-              variant="outline"
-              onClick={() => setShowRevise(true)}
-              disabled={capReached}
-            >
-              Revise
-            </Button>
+
+          {capReached && (
+            <p className="text-xs text-destructive">Generation limit reached</p>
           )}
         </div>
       </div>

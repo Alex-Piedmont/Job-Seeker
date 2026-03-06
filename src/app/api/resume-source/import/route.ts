@@ -12,8 +12,18 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
 
   const parsed = parseResumeMarkdown(validation.data.markdown);
 
+  console.log("[import] parsed:", {
+    contact: parsed.contact.fullName,
+    education: parsed.education.length,
+    experiences: parsed.experiences.length,
+    skills: parsed.skills.length,
+    publications: parsed.publications.length,
+    customSections: parsed.customSections.length,
+  });
+
+  let step = "init";
   const resumeSource = await prisma.$transaction(async (tx) => {
-    // Upsert ResumeSource (handles users who haven't visited the page)
+    step = "upsert";
     const rs = await tx.resumeSource.upsert({
       where: { userId },
       create: { userId },
@@ -21,7 +31,7 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
       select: { id: true },
     });
 
-    // Delete all existing child records
+    step = "delete-children";
     await tx.resumeContact.deleteMany({ where: { resumeSourceId: rs.id } });
     await tx.resumeEducation.deleteMany({ where: { resumeSourceId: rs.id } });
     await tx.resumeWorkExperience.deleteMany({ where: { resumeSourceId: rs.id } });
@@ -29,7 +39,7 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
     await tx.resumePublication.deleteMany({ where: { resumeSourceId: rs.id } });
     await tx.resumeCustomSection.deleteMany({ where: { resumeSourceId: rs.id } });
 
-    // Create contact
+    step = "create-contact";
     await tx.resumeContact.create({
       data: {
         resumeSourceId: rs.id,
@@ -43,7 +53,7 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
       },
     });
 
-    // Create education entries
+    step = "create-education";
     for (let i = 0; i < parsed.education.length; i++) {
       const edu = parsed.education[i];
       await tx.resumeEducation.create({
@@ -62,9 +72,10 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
       });
     }
 
-    // Create experience entries with subsections
+    step = "create-experiences";
     for (let i = 0; i < parsed.experiences.length; i++) {
       const exp = parsed.experiences[i];
+      step = `create-experience-${i}(${exp.company})`;
       const experience = await tx.resumeWorkExperience.create({
         data: {
           resumeSourceId: rs.id,
@@ -80,6 +91,7 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
 
       for (let j = 0; j < exp.subsections.length; j++) {
         const sub = exp.subsections[j];
+        step = `create-subsection-${i}.${j}(${sub.label})`;
         await tx.resumeWorkSubsection.create({
           data: {
             workExperienceId: experience.id,
@@ -91,7 +103,7 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
       }
     }
 
-    // Create skill entries
+    step = "create-skills";
     for (let i = 0; i < parsed.skills.length; i++) {
       const skill = parsed.skills[i];
       await tx.resumeSkill.create({
@@ -104,9 +116,10 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
       });
     }
 
-    // Create publication entries
+    step = "create-publications";
     for (let i = 0; i < parsed.publications.length; i++) {
       const pub = parsed.publications[i];
+      step = `create-publication-${i}(${pub.title.substring(0, 30)})`;
       await tx.resumePublication.create({
         data: {
           resumeSourceId: rs.id,
@@ -120,7 +133,7 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
       });
     }
 
-    // Create custom sections
+    step = "create-custom-sections";
     for (let i = 0; i < parsed.customSections.length; i++) {
       const section = parsed.customSections[i];
       await tx.resumeCustomSection.create({
@@ -133,17 +146,20 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
       });
     }
 
-    // Update miscellaneous
+    step = "update-misc";
     await tx.resumeSource.update({
       where: { id: rs.id },
       data: { miscellaneous: parsed.miscellaneous },
     });
 
-    // Return full data
+    step = "final-query";
     return tx.resumeSource.findUniqueOrThrow({
       where: { id: rs.id },
       include: fullInclude,
     });
+  }).catch((err) => {
+    console.error(`[import] FAILED at step: ${step}`, err);
+    throw err;
   });
 
   return NextResponse.json(resumeSource);

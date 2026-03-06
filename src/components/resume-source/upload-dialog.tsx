@@ -22,8 +22,8 @@ const MAX_FILE_SIZE = 200 * 1024; // 200KB
 
 export function UploadDialog({ onImport }: UploadDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [fileContent, setFileContent] = useState<string>("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,6 +51,7 @@ export function UploadDialog({ onImport }: UploadDialogProps) {
   };
 
   const handleConfirm = async () => {
+    console.log("[upload] fileContent length:", fileContent.length);
     setIsUploading(true);
     try {
       const res = await fetch("/api/resume-source/import", {
@@ -86,7 +87,7 @@ export function UploadDialog({ onImport }: UploadDialogProps) {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".md,.txt"
+        accept=".md,.txt,.markdown"
         onChange={handleFileSelect}
         className="hidden"
       />

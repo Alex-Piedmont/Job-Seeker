@@ -45,6 +45,10 @@
 5. **Document Results**: Add review section to `tasks/todo.md`
 6. **Capture Lessons**: Update `tasks/lessons.md` after corrections
 
+## Skill Routing
+
+- When the user asks to "write a PRD", "build a PRD", "create a PRD", or "draft a PRD", invoke the `/prd` skill via the Skill tool. Pass the user's feature description as the argument.
+
 ## Core Principles
 
 - **Simplicity First**: Make every change as simple as possible. Impact minimal code.
