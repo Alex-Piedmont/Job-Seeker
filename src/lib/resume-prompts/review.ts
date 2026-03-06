@@ -28,6 +28,8 @@ If the target company is well-known (e.g., FAANG, major consultancies, Fortune 5
 
 Be specific and actionable in your feedback. Reference exact bullets and phrases. Grade honestly — an "A" means the resume would likely pass ATS screening AND impress a hiring manager for this specific role.
 
+Keep all text fields concise (1-3 sentences). Limit bullet improvements to the 5 most impactful changes. For keywords, list only the most relevant terms (up to 10 matched, up to 8 missing).
+
 Grading rubric:
 - A: Strong keyword alignment, impact-first bullets with quantified results, clear narrative arc, no significant gaps
 - B: Good alignment with minor keyword gaps, mostly impact-first bullets, coherent narrative
@@ -45,8 +47,8 @@ export const REVIEW_TOOL = {
         type: "object",
         description: "Keywords from the JD that appear or are missing in the resume",
         properties: {
-          matched: { type: "array", items: { type: "string" } },
-          missing: { type: "array", items: { type: "string" } },
+          matched: { type: "array", items: { type: "string" }, maxItems: 10 },
+          missing: { type: "array", items: { type: "string" }, maxItems: 8 },
         },
         required: ["matched", "missing"],
       },
@@ -56,7 +58,8 @@ export const REVIEW_TOOL = {
       },
       bulletImprovements: {
         type: "array",
-        description: "Specific bullets that could be improved, with suggestions",
+        description: "Top 5 most impactful bullet improvements",
+        maxItems: 5,
         items: {
           type: "object",
           properties: {

@@ -61,6 +61,18 @@ export async function callWithTool<T>(
     tools: [tool],
     tool_choice: { type: "tool", name: tool.name },
   });
+
+  if (response.stop_reason === "max_tokens") {
+    console.error(
+      `[callWithTool] Response truncated (max_tokens hit) for tool "${tool.name}". ` +
+      `Output tokens: ${response.usage.output_tokens}, limit: ${options?.maxTokens ?? 4096}. ` +
+      `Model: ${modelId}. Response data may be incomplete.`
+    );
+    throw new Error(
+      "AI response was truncated due to length limits. Please try again or contact support."
+    );
+  }
+
   const toolBlock = response.content.find((b) => b.type === "tool_use");
   if (!toolBlock || toolBlock.type !== "tool_use") {
     throw new Error("Expected tool_use response from Claude");
