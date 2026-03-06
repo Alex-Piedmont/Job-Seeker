@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
   .split(",")
-  .map((e) => e.trim())
+  .map((e) => e.trim().replace(/\\n/g, ""))
   .filter(Boolean);
 
 export function isAdminEmail(email: string | null | undefined): boolean {

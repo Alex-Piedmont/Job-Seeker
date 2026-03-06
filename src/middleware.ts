@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 import { NextResponse } from "next/server";
-import { isPublicPath, isAdminPath } from "@/lib/route-utils";
+import { isPublicPath } from "@/lib/route-utils";
 
 const { auth } = NextAuth(authConfig);
 
@@ -22,13 +22,8 @@ export default auth((req) => {
     return NextResponse.redirect(signInUrl);
   }
 
-  // Admin route guard
-  if (isAdminPath(pathname)) {
-    const role = req.auth?.user?.role;
-    if (role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
-    }
-  }
+  // Admin authorization is enforced at the page and API route level
+  // (admin page checks session.user.role, API routes use adminHandler wrapper)
 
   return NextResponse.next();
 });
