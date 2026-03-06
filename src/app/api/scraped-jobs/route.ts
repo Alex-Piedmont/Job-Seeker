@@ -19,30 +19,44 @@ export async function GET(request: Request) {
       { status: 400 }
     );
   }
-  const { q, company, companyId, location, locationType, includeRemoved, includeArchived, page, limit, sort, order } = parsed.data;
+  const { q, company, companyId, companyIds, location, locationType, salaryMin, salaryMax, postedFrom, postedTo, includeRemoved, includeArchived, page, limit, sort, order } = parsed.data;
 
   const where: Record<string, unknown> = {};
 
   if (q) {
     where.title = { contains: q, mode: "insensitive" };
   }
-  if (companyId) {
+  if (companyIds) {
+    where.companyId = { in: companyIds.split(",").filter(Boolean) };
+  } else if (companyId) {
     where.companyId = companyId;
   } else if (company) {
     where.company = { name: { equals: company, mode: "insensitive" } };
   }
   if (location) {
-    // Cast locations JSON to string and search
     where.locations = { string_contains: location };
   }
   if (locationType) {
     where.locationType = locationType;
+  }
+  if (salaryMin !== undefined) {
+    where.salaryMax = { gte: salaryMin };
+  }
+  if (salaryMax !== undefined) {
+    where.salaryMin = { ...(typeof where.salaryMin === "object" ? where.salaryMin as Record<string, unknown> : {}), lte: salaryMax };
+  }
+  if (postedFrom) {
+    where.firstSeenAt = { gte: new Date(postedFrom) };
+  }
+  if (postedTo) {
+    where.firstSeenAt = { ...(typeof where.firstSeenAt === "object" ? where.firstSeenAt as Record<string, unknown> : {}), lte: new Date(postedTo) };
   }
   if (!includeRemoved) {
     where.removedAt = null;
   }
   if (!includeArchived) {
     where.archivedAt = null;
+    where.NOT = { userArchives: { some: { userId } } };
   }
 
   const skip = (page - 1) * limit;

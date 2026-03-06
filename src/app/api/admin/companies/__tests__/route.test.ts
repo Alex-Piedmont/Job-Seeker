@@ -53,6 +53,8 @@ vi.mock("@/lib/admin", () => ({
 
 import { GET, POST } from "../route";
 import { PUT, DELETE } from "../[id]/route";
+import { PATCH as TOGGLE } from "../[id]/toggle/route";
+import { POST as SCRAPE } from "../[id]/scrape/route";
 
 function callGet(query = "") {
   return GET(
@@ -87,6 +89,24 @@ function callDelete(id: string) {
   return DELETE(
     new Request(`http://localhost/api/admin/companies/${id}`, {
       method: "DELETE",
+    }),
+    { params: Promise.resolve({ id }) }
+  );
+}
+
+function callToggle(id: string) {
+  return TOGGLE(
+    new Request(`http://localhost/api/admin/companies/${id}/toggle`, {
+      method: "PATCH",
+    }),
+    { params: Promise.resolve({ id }) }
+  );
+}
+
+function callScrape(id: string) {
+  return SCRAPE(
+    new Request(`http://localhost/api/admin/companies/${id}/scrape`, {
+      method: "POST",
     }),
     { params: Promise.resolve({ id }) }
   );
@@ -240,13 +260,113 @@ describe("DELETE /api/admin/companies/[id]", () => {
     expect(body.error).toBe("Company not found");
   });
 
-  it("deletes company successfully", async () => {
+  it("soft-deletes company successfully", async () => {
     mockAuth.mockReturnValue({ user: { id: "admin1", role: "ADMIN" } });
     mockCompany.findUnique.mockResolvedValue(sampleCompany);
-    mockCompany.delete.mockResolvedValue(sampleCompany);
+    mockCompany.update.mockResolvedValue({ ...sampleCompany, isRemoved: true });
 
     const res = await callDelete("comp-1");
     expect(res.status).toBe(204);
-    expect(mockCompany.delete).toHaveBeenCalledOnce();
+    expect(mockCompany.update).toHaveBeenCalledWith({
+      where: { id: "comp-1" },
+      data: { isRemoved: true },
+    });
+  });
+});
+
+describe("PATCH /api/admin/companies/[id]/toggle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 404 when company not found", async () => {
+    mockAuth.mockReturnValue({ user: { id: "admin1", role: "ADMIN" } });
+    mockCompany.findUnique.mockResolvedValue(null);
+
+    const res = await callToggle("comp-999");
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe("Company not found");
+  });
+
+  it("returns 404 when company is removed", async () => {
+    mockAuth.mockReturnValue({ user: { id: "admin1", role: "ADMIN" } });
+    mockCompany.findUnique.mockResolvedValue({ ...sampleCompany, isRemoved: true });
+
+    const res = await callToggle("comp-1");
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe("Company not found");
+  });
+
+  it("toggles enabled to false", async () => {
+    mockAuth.mockReturnValue({ user: { id: "admin1", role: "ADMIN" } });
+    mockCompany.findUnique.mockResolvedValue({ ...sampleCompany, enabled: true });
+    mockCompany.update.mockResolvedValue({ ...sampleCompany, enabled: false });
+
+    const res = await callToggle("comp-1");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.enabled).toBe(false);
+    expect(mockCompany.update).toHaveBeenCalledWith({
+      where: { id: "comp-1" },
+      data: { enabled: false },
+    });
+  });
+
+  it("toggles enabled to true", async () => {
+    mockAuth.mockReturnValue({ user: { id: "admin1", role: "ADMIN" } });
+    mockCompany.findUnique.mockResolvedValue({ ...sampleCompany, enabled: false });
+    mockCompany.update.mockResolvedValue({ ...sampleCompany, enabled: true });
+
+    const res = await callToggle("comp-1");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.enabled).toBe(true);
+    expect(mockCompany.update).toHaveBeenCalledWith({
+      where: { id: "comp-1" },
+      data: { enabled: true },
+    });
+  });
+});
+
+describe("POST /api/admin/companies/[id]/scrape", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 404 when company not found", async () => {
+    mockAuth.mockReturnValue({ user: { id: "admin1", role: "ADMIN" } });
+    mockCompany.findUnique.mockResolvedValue(null);
+
+    const res = await callScrape("comp-999");
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe("Company not found");
+  });
+
+  it("returns 400 when company is disabled", async () => {
+    mockAuth.mockReturnValue({ user: { id: "admin1", role: "ADMIN" } });
+    mockCompany.findUnique.mockResolvedValue({ ...sampleCompany, enabled: false });
+
+    const res = await callScrape("comp-1");
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("Company is disabled. Enable it before triggering a scrape.");
+  });
+
+  it("returns 202 and queues scrape", async () => {
+    mockAuth.mockReturnValue({ user: { id: "admin1", role: "ADMIN" } });
+    mockCompany.findUnique.mockResolvedValue(sampleCompany);
+    mockCompany.update.mockResolvedValue({ ...sampleCompany, scrapeStatus: "PENDING" });
+
+    const res = await callScrape("comp-1");
+    expect(res.status).toBe(202);
+    const body = await res.json();
+    expect(body.message).toBe("Scrape queued");
+    expect(mockCompany.update).toHaveBeenCalledWith({
+      where: { id: "comp-1" },
+      data: { scrapeStatus: "PENDING" },
+    });
   });
 });

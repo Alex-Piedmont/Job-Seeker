@@ -28,6 +28,7 @@ const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/resume-source", label: "Resume Source" },
   { href: "/applications", label: "Applications" },
+  { href: "/find-jobs", label: "Find Jobs" },
   { href: "/analytics", label: "Analytics" },
 ];
 

@@ -263,7 +263,7 @@ src/
 - `npm run test` — 203/203 tests pass (8 new for PRD 7)
 - `npm run build` — succeeds (32 routes)
 
-### All PRDs Complete
+### All PRDs Complete (1-7)
 PRDs 1-7 fully implemented. 203 tests passing. Production-ready.
 
 ---
@@ -437,3 +437,47 @@ PRDs 1-7 fully implemented. 203 tests passing. Production-ready.
 - `npx vitest run` — 32 files, 290/290 tests pass (33 new for PRD 9)
 - `npx prisma migrate dev` — `add_wizard_models` migration applied
 - Backward compatible: existing generate API works unchanged with no optional fields
+
+---
+
+## PRD 16: Admin Job Sources & Kanban Integration — COMPLETE
+
+- [x] Phase 1: Schema migration — `isRemoved` on Company, `scrapedJobId` FK on JobApplication, `applications` relation on ScrapedJob
+- [x] Phase 2: Admin company API enhancements — GET filters removed, soft delete, toggle endpoint, scrape trigger endpoint
+- [x] Phase 3: Import API — `POST /api/applications/import` with transaction, serial number, cap enforcement
+- [x] Phase 4: Admin Job Sources Tab UI — job-sources-tab.tsx, company-form.tsx, 5th admin tab
+- [x] Phase 5: Kanban integration — "Add to Board" button, "Apply Here!" in drawer, removal warning badges
+- [x] Phase 6: Tests — 14 new tests (7 toggle/scrape, 7 import), updated existing tests
+
+### New Files (7)
+| File | Purpose |
+|------|---------|
+| `src/app/api/admin/companies/[id]/toggle/route.ts` | PATCH: toggle company enabled state |
+| `src/app/api/admin/companies/[id]/scrape/route.ts` | POST: queue scrape for company |
+| `src/app/api/applications/import/route.ts` | POST: import scraped job to Kanban board |
+| `src/app/api/applications/import/__tests__/route.test.ts` | Import endpoint tests (7 tests) |
+| `src/components/admin/job-sources-tab.tsx` | Admin data table for managing companies |
+| `src/components/admin/company-form.tsx` | Dialog form for create/edit company |
+| `prisma/migrations/20260306200000_add_company_import_link/migration.sql` | Schema migration |
+
+### Modified Files (10)
+| File | Change |
+|------|--------|
+| `prisma/schema.prisma` | `isRemoved` on Company, `scrapedJobId` FK on JobApplication |
+| `src/app/api/admin/companies/route.ts` | GET filters `isRemoved`, counts active jobs only |
+| `src/app/api/admin/companies/[id]/route.ts` | DELETE → soft delete, PUT checks isRemoved |
+| `src/app/api/admin/companies/__tests__/route.test.ts` | Updated DELETE test + 7 new toggle/scrape tests |
+| `src/app/(authenticated)/admin/page.tsx` | Added "Job Sources" tab |
+| `src/components/find-jobs/job-detail-modal.tsx` | Working "Add to Board" button |
+| `src/app/(authenticated)/find-jobs/page.tsx` | Track importedJobIds state |
+| `src/components/kanban/application-detail-drawer.tsx` | "Apply Here!" button + removal warning |
+| `src/components/kanban/application-card.tsx` | Amber warning badge for removed postings |
+| `src/app/api/kanban/columns/route.ts` | Include scrapedJob.removedAt in card data |
+| `src/app/api/kanban/applications/[id]/route.ts` | Include scrapedJob.removedAt in detail |
+| `src/components/find-jobs/__tests__/job-detail-modal.test.tsx` | Updated for new props + import test |
+
+### Verification
+- `npx tsc --noEmit` — 0 new errors (pre-existing e2e/mock type issues remain)
+- `npx vitest run` — 53 files, 445/445 tests pass (14 new for PRD 16)
+- `npm run build` — succeeds
+- `npx prisma generate` — success

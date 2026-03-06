@@ -8,7 +8,7 @@ export const PUT = adminHandler(async (request, { params }) => {
   const { id } = params;
 
   const existing = await prisma.company.findUnique({ where: { id } });
-  if (!existing) {
+  if (!existing || existing.isRemoved) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
   }
 
@@ -44,6 +44,6 @@ export const DELETE = adminHandler(async (_request, { params }) => {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
   }
 
-  await prisma.company.delete({ where: { id } });
+  await prisma.company.update({ where: { id }, data: { isRemoved: true } });
   return new Response(null, { status: 204 });
 });

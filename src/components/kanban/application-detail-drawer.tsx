@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import { toast } from "sonner";
-import { ChevronDown, Copy, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, Trash2, ExternalLink, AlertTriangle } from "lucide-react";
 import { GenerateButton } from "@/components/resume/generate-button";
 import { ResumeEditor } from "@/components/resume/resume-editor";
 import { DownloadButton } from "@/components/resume/download-button";
@@ -83,6 +83,8 @@ interface ApplicationDetail {
   }>;
   notes: Array<{ id: string; content: string; createdAt: string }>;
   column: { id: string; name: string; columnType: string | null };
+  scrapedJobId: string | null;
+  scrapedJob: { removedAt: string | null } | null;
 }
 
 interface ApplicationDetailDrawerProps {
@@ -512,13 +514,39 @@ export function ApplicationDetailDrawer({
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Posting URL</Label>
-                  <Input
-                    defaultValue={app.postingUrl ?? ""}
-                    onBlur={(e) =>
-                      handleFieldBlur("postingUrl", e.target.value)
-                    }
-                    maxLength={2000}
-                  />
+                  {app.scrapedJobId ? (
+                    <div className="space-y-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        asChild
+                      >
+                        <a
+                          href={app.postingUrl ?? "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="mr-1 h-4 w-4" />
+                          Apply Here!
+                        </a>
+                      </Button>
+                      {app.scrapedJob?.removedAt && (
+                        <div className="flex items-center gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-2 text-xs text-amber-800 dark:text-amber-200">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                          <span>This job posting is no longer available on the company&apos;s careers page.</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Input
+                      defaultValue={app.postingUrl ?? ""}
+                      onBlur={(e) =>
+                        handleFieldBlur("postingUrl", e.target.value)
+                      }
+                      maxLength={2000}
+                    />
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Hiring Org</Label>

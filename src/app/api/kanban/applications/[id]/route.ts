@@ -22,6 +22,7 @@ export async function GET(
       notes: { orderBy: { createdAt: "desc" } },
       column: { select: { id: true, name: true, columnType: true } },
       statusLogs: { orderBy: { movedAt: "desc" }, take: 1 },
+      scrapedJob: { select: { removedAt: true } },
     },
   });
   if (!application) {

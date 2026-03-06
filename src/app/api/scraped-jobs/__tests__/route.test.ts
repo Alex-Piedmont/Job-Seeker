@@ -60,7 +60,7 @@ describe("GET /api/scraped-jobs", () => {
     expect(body.jobs[0].id).toBe("job1");
     expect(body.pagination).toEqual({
       page: 1,
-      limit: 20,
+      limit: 24,
       total: 1,
       totalPages: 1,
     });
@@ -91,7 +91,7 @@ describe("GET /api/scraped-jobs", () => {
     expect(findManyCall.where.companyId).toBe("c1");
   });
 
-  it("excludes removed jobs by default", async () => {
+  it("includes removed jobs by default", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user1" } });
     mockPrisma.scrapedJob.findMany.mockResolvedValue([]);
     mockPrisma.scrapedJob.count.mockResolvedValue(0);
@@ -99,18 +99,68 @@ describe("GET /api/scraped-jobs", () => {
     await callGet();
 
     const findManyCall = mockPrisma.scrapedJob.findMany.mock.calls[0][0];
-    expect(findManyCall.where.removedAt).toBeNull();
+    expect(findManyCall.where.removedAt).toBeUndefined();
   });
 
-  it("includes removed jobs when includeRemoved=true", async () => {
+  it("excludes removed jobs when includeRemoved=false", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user1" } });
     mockPrisma.scrapedJob.findMany.mockResolvedValue([]);
     mockPrisma.scrapedJob.count.mockResolvedValue(0);
 
-    await callGet("?includeRemoved=true");
+    await callGet("?includeRemoved=false");
 
     const findManyCall = mockPrisma.scrapedJob.findMany.mock.calls[0][0];
-    expect(findManyCall.where.removedAt).toBeUndefined();
+    expect(findManyCall.where.removedAt).toBeNull();
+  });
+
+  it("applies companyIds filter", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user1" } });
+    mockPrisma.scrapedJob.findMany.mockResolvedValue([]);
+    mockPrisma.scrapedJob.count.mockResolvedValue(0);
+
+    await callGet("?companyIds=c1,c2");
+
+    const findManyCall = mockPrisma.scrapedJob.findMany.mock.calls[0][0];
+    expect(findManyCall.where.companyId).toEqual({ in: ["c1", "c2"] });
+  });
+
+  it("applies salary filters", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user1" } });
+    mockPrisma.scrapedJob.findMany.mockResolvedValue([]);
+    mockPrisma.scrapedJob.count.mockResolvedValue(0);
+
+    await callGet("?salaryMin=100000&salaryMax=200000");
+
+    const findManyCall = mockPrisma.scrapedJob.findMany.mock.calls[0][0];
+    expect(findManyCall.where.salaryMax).toEqual({ gte: 100000 });
+    expect(findManyCall.where.salaryMin).toEqual({ lte: 200000 });
+  });
+
+  it("applies date range filters", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user1" } });
+    mockPrisma.scrapedJob.findMany.mockResolvedValue([]);
+    mockPrisma.scrapedJob.count.mockResolvedValue(0);
+
+    await callGet("?postedFrom=2025-01-01&postedTo=2025-06-30");
+
+    const findManyCall = mockPrisma.scrapedJob.findMany.mock.calls[0][0];
+    expect(findManyCall.where.firstSeenAt).toEqual({
+      gte: new Date("2025-01-01"),
+      lte: new Date("2025-06-30"),
+    });
+  });
+
+  it("excludes user-archived jobs when includeArchived=false", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user1" } });
+    mockPrisma.scrapedJob.findMany.mockResolvedValue([]);
+    mockPrisma.scrapedJob.count.mockResolvedValue(0);
+
+    await callGet();
+
+    const findManyCall = mockPrisma.scrapedJob.findMany.mock.calls[0][0];
+    expect(findManyCall.where.NOT).toEqual({
+      userArchives: { some: { userId: "user1" } },
+    });
   });
 
   it("returns isArchived=true when user has archive record", async () => {

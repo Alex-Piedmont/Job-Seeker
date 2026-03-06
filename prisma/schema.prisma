@@ -153,8 +153,11 @@ model JobApplication {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
+  scrapedJobId        String?
+
   user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   column     KanbanColumn         @relation(fields: [columnId], references: [id], onDelete: Restrict)
+  scrapedJob ScrapedJob?          @relation(fields: [scrapedJobId], references: [id], onDelete: SetNull)
   interviews          InterviewRecord[]
   statusLogs          ApplicationStatusLog[]
   notes               ApplicationNote[]
@@ -163,6 +166,7 @@ model JobApplication {
   fitAnalysisCaches   FitAnalysisCache[]
 
   @@unique([userId, serialNumber])
+  @@unique([userId, scrapedJobId])
   @@index([columnId])
   @@index([userId])
   @@map("job_applications")
@@ -432,6 +436,7 @@ model Company {
   atsPlatform   AtsPlatform
   baseUrl       String
   enabled       Boolean       @default(true)
+  isRemoved     Boolean       @default(false)
   lastScrapeAt  DateTime?
   scrapeStatus  ScrapeStatus  @default(PENDING)
   scrapeError   String?       @db.Text
@@ -464,6 +469,7 @@ model ScrapedJob {
 
   company       Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   userArchives  UserJobArchive[]
+  applications  JobApplication[]
 
   @@unique([companyId, externalJobId])
   @@index([companyId])

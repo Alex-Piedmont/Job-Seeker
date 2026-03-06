@@ -14,14 +14,16 @@ export const GET = adminHandler(async (request) => {
   const order = url.searchParams.get("order") === "desc" ? "desc" : ("asc" as const);
 
   const skip = (page - 1) * limit;
+  const where = { isRemoved: false };
   const [companies, total] = await Promise.all([
     prisma.company.findMany({
+      where,
       orderBy: { [sort]: order },
       skip,
       take: limit,
-      include: { _count: { select: { scrapedJobs: true } } },
+      include: { _count: { select: { scrapedJobs: { where: { removedAt: null } } } } },
     }),
-    prisma.company.count(),
+    prisma.company.count({ where }),
   ]);
 
   return Response.json({

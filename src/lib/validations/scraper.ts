@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+const booleanString = z
+  .union([z.boolean(), z.string()])
+  .transform((val) => (typeof val === "string" ? val === "true" : val));
+
 const atsPlatformValues = ["GREENHOUSE", "LEVER", "WORKDAY", "ICIMS"] as const;
 
 export const createCompanySchema = z.object({
@@ -24,12 +28,17 @@ export const scrapedJobQuerySchema = z.object({
   q: z.string().optional(),
   company: z.string().optional(),
   companyId: z.string().optional(),
+  companyIds: z.string().optional(), // comma-separated company IDs
   location: z.string().optional(),
   locationType: z.string().optional(),
-  includeRemoved: z.coerce.boolean().optional().default(false),
-  includeArchived: z.coerce.boolean().optional().default(false),
+  salaryMin: z.coerce.number().int().min(0).optional(),
+  salaryMax: z.coerce.number().int().min(0).optional(),
+  postedFrom: z.string().optional(), // ISO date string
+  postedTo: z.string().optional(), // ISO date string
+  includeRemoved: booleanString.optional().default(true),
+  includeArchived: booleanString.optional().default(false),
   page: z.coerce.number().int().min(1).optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(24),
   sort: z.enum(["firstSeenAt", "title", "salaryMax"]).optional().default("firstSeenAt"),
   order: z.enum(["asc", "desc"]).optional().default("desc"),
 });

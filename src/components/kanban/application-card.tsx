@@ -30,6 +30,7 @@ export interface ApplicationCardData {
   notes: { createdAt: string }[];
   interviews: { createdAt: string }[];
   resumeGenerations?: { reviewJson: string | null }[];
+  scrapedJob?: { removedAt: string | null } | null;
 }
 
 interface ApplicationCardProps {
@@ -94,6 +95,14 @@ export function ApplicationCard({
               {application.company}
             </span>
             <div className="flex items-center gap-1">
+              {application.scrapedJob?.removedAt && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                  </TooltipTrigger>
+                  <TooltipContent>Posting no longer available</TooltipContent>
+                </Tooltip>
+              )}
               {staleness === "muted" && (
                 <Clock className="h-3.5 w-3.5 text-muted-foreground" />
               )}
