@@ -9,6 +9,12 @@
     },
     "src/app/api/resume/review/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/admin/companies/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/admin/companies/[id]/scrape/route.ts": {
+      "maxDuration": 60
     }
   }
 }

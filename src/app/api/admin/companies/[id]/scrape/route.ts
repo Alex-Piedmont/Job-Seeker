@@ -18,11 +18,6 @@ export const POST = adminHandler(async (_request, { params }) => {
     );
   }
 
-  await prisma.company.update({
-    where: { id },
-    data: { scrapeStatus: "PENDING" },
-  });
-
   after(async () => {
     await scrapeCompany({
       id: existing.id,

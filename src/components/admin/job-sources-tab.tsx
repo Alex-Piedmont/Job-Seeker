@@ -130,12 +130,6 @@ export function JobSourcesTab() {
       });
       if (!res.ok) throw new Error("Failed to trigger scrape");
       toast.success(`Scrape triggered for ${company.name}`);
-      // Update status locally
-      setCompanies((cs) =>
-        cs.map((c) =>
-          c.id === company.id ? { ...c, scrapeStatus: "PENDING" } : c
-        )
-      );
     } catch {
       toast.error(`Failed to trigger scrape for ${company.name}`);
     } finally {
@@ -173,10 +167,6 @@ export function JobSourcesTab() {
   function openEdit(company: Company) {
     setEditingCompany(company);
     setFormOpen(true);
-  }
-
-  function isScraping(company: Company) {
-    return company.scrapeStatus === "PENDING";
   }
 
   if (loading) {
@@ -288,12 +278,7 @@ export function JobSourcesTab() {
                   />
                 </td>
                 <td className="px-4 py-3">
-                  {isScraping(company) ? (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Scraping...
-                    </span>
-                  ) : company.lastScrapeAt ? (
+                  {company.lastScrapeAt ? (
                     formatDistanceToNow(new Date(company.lastScrapeAt), {
                       addSuffix: true,
                     })
@@ -311,7 +296,7 @@ export function JobSourcesTab() {
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => handleSync(company)}
-                          disabled={syncingIds.has(company.id) || isScraping(company)}
+                          disabled={syncingIds.has(company.id)}
                         >
                           {syncingIds.has(company.id) ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
