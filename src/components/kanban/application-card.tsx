@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { GripVertical, Clock, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -48,6 +49,7 @@ export function ApplicationCard({
   onClick,
   dragHandleProps,
 }: ApplicationCardProps) {
+  const isDragging = React.useRef(false);
   const compensation = getCompensationDisplay(application);
   const interviewCount = application._count.interviews;
   const resumeGrade = (() => {
@@ -73,17 +75,25 @@ export function ApplicationCard({
   return (
     <div
       className={cn(
-        "group relative rounded-lg border bg-card p-4 shadow-sm cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200",
+        "group relative rounded-lg border bg-card p-4 shadow-sm cursor-grab hover:shadow-md hover:-translate-y-0.5 transition-[box-shadow,opacity] duration-200",
         staleness === "muted" && "opacity-60",
         staleness === "warning" && "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
       )}
       style={{ borderLeftWidth: 3, borderLeftColor: columnColor }}
-      onClick={onClick}
+      onMouseDown={() => { isDragging.current = false; }}
+      onMouseMove={() => { isDragging.current = true; }}
+      onClick={(e) => {
+        if (isDragging.current) {
+          e.stopPropagation();
+          return;
+        }
+        onClick();
+      }}
+      {...dragHandleProps}
     >
       <div className="flex items-start gap-2">
         <div
-          className="mt-0.5 cursor-grab text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-          {...dragHandleProps}
+          className="mt-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
         >
           <GripVertical className="h-4 w-4" />
         </div>
