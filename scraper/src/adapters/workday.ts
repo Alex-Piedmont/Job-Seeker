@@ -105,7 +105,8 @@ export class WorkdayAdapter implements AtsAdapter {
         try {
           await delay(config.delays.betweenRequests);
 
-          const detailUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/job/${posting.externalPath}`;
+          const path = posting.externalPath.replace(/^\/job\//, "");
+          const detailUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/job/${path}`;
           const detailRes = await fetch(detailUrl, {
             headers: { "User-Agent": config.userAgent },
           });
@@ -132,7 +133,7 @@ export class WorkdayAdapter implements AtsAdapter {
           jobs.push({
             externalJobId: info.jobReqId ?? posting.externalPath,
             title: info.title ?? posting.title,
-            url: `https://${host}/en-US/${siteId}/job/${posting.externalPath}`,
+            url: `https://${host}/en-US/${siteId}/job/${path}`,
             department: info.jobFamilyGroup ?? null,
             locations,
             locationType,
