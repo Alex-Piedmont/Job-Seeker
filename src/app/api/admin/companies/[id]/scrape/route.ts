@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { adminHandler } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
+import { scrapeCompany } from "@/lib/scraper/scrape-company";
 
 export const POST = adminHandler(async (_request, { params }) => {
   const { id } = params;
@@ -22,5 +23,14 @@ export const POST = adminHandler(async (_request, { params }) => {
     data: { scrapeStatus: "PENDING" },
   });
 
-  return Response.json({ message: "Scrape queued" }, { status: 202 });
+  after(async () => {
+    await scrapeCompany({
+      id: existing.id,
+      name: existing.name,
+      baseUrl: existing.baseUrl,
+      atsPlatform: existing.atsPlatform,
+    });
+  });
+
+  return Response.json({ message: "Scrape triggered" }, { status: 202 });
 });
