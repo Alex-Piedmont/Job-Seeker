@@ -9,15 +9,26 @@ import { ExperienceSection } from "@/components/resume-source/experience-section
 import { SkillsSection } from "@/components/resume-source/skills-section";
 import { PublicationsSection } from "@/components/resume-source/publications-section";
 import { UploadDialog } from "@/components/resume-source/upload-dialog";
+import { ResumeSourceGuide } from "@/components/resume-source/resume-source-guide";
 import { CustomSectionEditor } from "@/components/resume-source/custom-section-editor";
 import { MiscellaneousEditor } from "@/components/resume-source/miscellaneous-editor";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { ResumeSourceData, ResumeCustomSection } from "@/types/resume-source";
 
 export default function ResumeSourcePage() {
   const { data, isLoading, mutate, refetch } = useResumeSource();
   const [activeTab, setActiveTab] = useState<string>("contact");
+  const [guideOpen, setGuideOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return !localStorage.getItem("resume-source-guide-seen");
+    } catch {
+      return false;
+    }
+  });
 
   if (isLoading) {
     return (
@@ -109,8 +120,20 @@ export default function ResumeSourcePage() {
         ) : (
           <div className="flex-1" />
         )}
-        <UploadDialog onImport={handleImport} />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setGuideOpen(true)}
+            aria-label="How to structure your experience"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </Button>
+          <UploadDialog onImport={handleImport} />
+        </div>
       </div>
+
+      <ResumeSourceGuide open={guideOpen} onOpenChange={setGuideOpen} />
 
       <SectionTabs
         activeTab={activeTab}
@@ -142,6 +165,7 @@ export default function ResumeSourcePage() {
               onUpdate={(experiences) =>
                 updateData((prev) => ({ ...prev, experiences }))
               }
+              onOpenGuide={() => setGuideOpen(true)}
             />
           )}
           {activeTab === "skills" && (

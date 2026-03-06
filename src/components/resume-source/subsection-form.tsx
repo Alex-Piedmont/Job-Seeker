@@ -17,7 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import type { ResumeWorkSubsection } from "@/types/resume-source";
 
 type SubsectionFormProps = {
@@ -25,7 +24,9 @@ type SubsectionFormProps = {
   experienceId: string;
   onSaved: (updated: ResumeWorkSubsection) => void;
   onDelete: () => void;
-  dragHandleProps?: DraggableProvidedDragHandleProps | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  dragHandleProps?: any;
+  initialExpanded?: boolean;
 };
 
 export function SubsectionForm({
@@ -34,10 +35,11 @@ export function SubsectionForm({
   onSaved,
   onDelete,
   dragHandleProps,
+  initialExpanded,
 }: SubsectionFormProps) {
   const [label, setLabel] = useState(subsection.label);
   const [bullets, setBullets] = useState(subsection.bullets);
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(!initialExpanded);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const saveSubsection = useCallback(
@@ -145,7 +147,9 @@ export function SubsectionForm({
 
       {!isCollapsed && (
         <>
-          {bullets.map((bullet, index) => (
+          {bullets.map((bullet, index) => {
+            const isFirstEmpty = bullet === "" && bullets.findIndex((b) => b === "") === index;
+            return (
             <div key={index} className="flex items-start gap-2 pl-6">
               <span className="text-muted-foreground mt-2">•</span>
               <Textarea
@@ -159,7 +163,11 @@ export function SubsectionForm({
                 ref={(el) => {
                   if (el) autoResizeTextarea(el);
                 }}
-                placeholder="Bullet point..."
+                placeholder={
+                  isFirstEmpty
+                    ? "What did you do, why did it matter, and what was the result?"
+                    : "Bullet point..."
+                }
                 className="flex-1 resize-none overflow-hidden min-h-[36px]"
                 rows={1}
               />
@@ -172,7 +180,8 @@ export function SubsectionForm({
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>
-          ))}
+            );
+          })}
 
           <Button
             variant="ghost"

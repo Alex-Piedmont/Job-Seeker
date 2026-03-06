@@ -15,11 +15,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  type DropResult,
-} from "@hello-pangea/dnd";
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   GripVertical,
   ChevronDown,
@@ -28,6 +37,11 @@ import {
   Plus,
   ChevronsUpDown,
   X,
+  Rocket,
+  Lightbulb,
+  TrendingUp,
+  Users,
+  Info,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAutoSave } from "@/hooks/use-auto-save";
@@ -38,21 +52,62 @@ import { fetchOrThrowSaveError } from "@/lib/fetch-with-save-error";
 import type { ResumeWorkExperience, ResumeWorkSubsection } from "@/types/resume-source";
 import { toast } from "sonner";
 
+const THINKING_PROMPTS = [
+  { label: "Projects I Led", icon: Rocket },
+  { label: "Problems I Solved", icon: Lightbulb },
+  { label: "Growth & Impact", icon: TrendingUp },
+  { label: "Collaboration & Leadership", icon: Users },
+] as const;
+
 type ExperienceSectionProps = {
   experiences: ResumeWorkExperience[];
   onUpdate: (experiences: ResumeWorkExperience[]) => void;
+  onOpenGuide?: () => void;
 };
+
+function SortableSubsection({
+  sub,
+  experienceId,
+  onSaved,
+  onDelete,
+  initialExpanded,
+}: {
+  sub: ResumeWorkSubsection;
+  experienceId: string;
+  onSaved: (updated: ResumeWorkSubsection) => void;
+  onDelete: () => void;
+  initialExpanded?: boolean;
+}) {
+  const { setNodeRef, transform, transition, listeners, attributes } =
+    useSortable({ id: sub.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <SubsectionForm
+        subsection={sub}
+        experienceId={experienceId}
+        onSaved={onSaved}
+        onDelete={onDelete}
+        dragHandleProps={{ ...listeners, ...attributes }}
+        initialExpanded={initialExpanded}
+      />
+    </div>
+  );
+}
 
 function ExperienceCard({
   entry,
-  index,
   isExpanded,
   onToggle,
   onSaved,
   onDelete,
 }: {
   entry: ResumeWorkExperience;
-  index: number;
   isExpanded: boolean;
   onToggle: () => void;
   onSaved: (updated: ResumeWorkExperience) => void;
@@ -64,6 +119,29 @@ function ExperienceCard({
   });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [altTitleInput, setAltTitleInput] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [newlyCreatedSubId, setNewlyCreatedSubId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (newlyCreatedSubId) setNewlyCreatedSubId(null);
+  }, [newlyCreatedSubId]);
+
+  const {
+    setNodeRef,
+    transform,
+    transition,
+    listeners,
+    attributes,
+  } = useSortable({ id: entry.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const subsectionSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
 
   const saveEntry = useCallback(
     async (data: ResumeWorkExperience) => {
@@ -107,23 +185,33 @@ function ExperienceCard({
 
   const handleBlur = () => trigger(fields);
 
-  const handleAddSubsection = async () => {
-    const res = await fetch(
-      `/api/resume-source/experience/${entry.id}/subsection`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: "New Subsection", bullets: [] }),
+  const handleAddSubsection = async (label = "New Subsection") => {
+    const isChip = label !== "New Subsection";
+    setIsCreating(true);
+    try {
+      const res = await fetch(
+        `/api/resume-source/experience/${entry.id}/subsection`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            label,
+            bullets: isChip ? [""] : [],
+          }),
+        }
+      );
+      if (!res.ok) {
+        toast.error("Failed to add subsection.");
+        return;
       }
-    );
-    if (!res.ok) {
-      toast.error("Failed to add subsection.");
-      return;
+      const created = await res.json();
+      if (isChip) setNewlyCreatedSubId(created.id);
+      const updated = { ...fields, subsections: [...fields.subsections, created] };
+      setFields(updated);
+      onSaved(updated);
+    } finally {
+      setIsCreating(false);
     }
-    const created = await res.json();
-    const updated = { ...fields, subsections: [...fields.subsections, created] };
-    setFields(updated);
-    onSaved(updated);
   };
 
   const handleDeleteSubsection = async (subId: string) => {
@@ -152,13 +240,18 @@ function ExperienceCard({
     onSaved(updated);
   };
 
-  const handleSubsectionDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
+  const handleSubsectionDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = fields.subsections.findIndex((s) => s.id === active.id);
+    const newIndex = fields.subsections.findIndex((s) => s.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
     const previousSubsections = [...fields.subsections];
-    const items = Array.from(fields.subsections);
-    const [removed] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, removed);
-    const reordered = items.map((item, i) => ({ ...item, sortOrder: i }));
+    const reordered = arrayMove(fields.subsections, oldIndex, newIndex).map(
+      (item, i) => ({ ...item, sortOrder: i })
+    );
     const updated = { ...fields, subsections: reordered };
     setFields(updated);
     onSaved(updated);
@@ -198,306 +291,320 @@ function ExperienceCard({
         : null;
 
   return (
-    <Draggable draggableId={entry.id} index={index}>
-      {(provided) => (
-        <div ref={provided.innerRef} {...provided.draggableProps}>
-          <Card>
-            <CardHeader className="flex flex-row items-center gap-2 p-3">
-              <div {...provided.dragHandleProps} aria-label="Drag to reorder">
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <button
-                onClick={onToggle}
-                className="flex flex-1 items-start gap-2 text-left"
-              >
-                <span className="mt-0.5">
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
+    <div ref={setNodeRef} style={style}>
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2 p-3">
+          <div {...listeners} {...attributes} aria-label="Drag to reorder">
+            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+          </div>
+          <button
+            onClick={onToggle}
+            className="flex flex-1 items-start gap-2 text-left"
+          >
+            <span className="mt-0.5">
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </span>
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold leading-tight">
+                {displayTitle}
+              </span>
+              {fields.company && (
+                <span className="text-xs text-muted-foreground">
+                  {fields.company}
                 </span>
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold leading-tight">
-                    {displayTitle}
-                  </span>
-                  {fields.company && (
-                    <span className="text-xs text-muted-foreground">
-                      {fields.company}
-                    </span>
-                  )}
-                  {timeframe && (
-                    <span className="text-xs text-muted-foreground">
-                      {timeframe}
-                    </span>
-                  )}
+              )}
+              {timeframe && (
+                <span className="text-xs text-muted-foreground">
+                  {timeframe}
+                </span>
+              )}
+            </div>
+          </button>
+          <SaveIndicator status={status} />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setDeleteOpen(true)}
+            className="h-8 w-8"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </CardHeader>
+        {isExpanded && (
+          <CardContent className="space-y-3 pt-0">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Company</Label>
+                <Input
+                  value={fields.company}
+                  onChange={(e) => handleChange("company", e.target.value)}
+                  onBlur={handleBlur}
+                  placeholder="Acme Corp"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Title</Label>
+                <Input
+                  value={fields.title}
+                  onChange={(e) => handleChange("title", e.target.value)}
+                  onBlur={handleBlur}
+                  placeholder="Senior PM"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Alternate Titles</Label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {fields.alternateTitles.map((alt, idx) => (
+                  <Badge key={idx} variant="secondary" className="gap-1">
+                    {alt}
+                    <button
+                      onClick={() => {
+                        const updated = fields.alternateTitles.filter(
+                          (_, i) => i !== idx
+                        );
+                        const updatedFields = {
+                          ...fields,
+                          alternateTitles: updated,
+                        };
+                        setFields(updatedFields);
+                        trigger(updatedFields);
+                      }}
+                      className="ml-0.5 hover:text-destructive"
+                      aria-label={`Remove ${alt}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <Input
+                value={altTitleInput}
+                onChange={(e) => setAltTitleInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault();
+                    const trimmed = altTitleInput.trim();
+                    if (
+                      !trimmed ||
+                      fields.alternateTitles.length >= 10 ||
+                      fields.alternateTitles.some(
+                        (t) => t.toLowerCase() === trimmed.toLowerCase()
+                      ) ||
+                      fields.title.toLowerCase() === trimmed.toLowerCase()
+                    )
+                      return;
+                    const updated = [
+                      ...fields.alternateTitles,
+                      trimmed,
+                    ];
+                    const updatedFields = {
+                      ...fields,
+                      alternateTitles: updated,
+                    };
+                    setFields(updatedFields);
+                    setAltTitleInput("");
+                    trigger(updatedFields);
+                  }
+                  if (
+                    e.key === "Backspace" &&
+                    !altTitleInput &&
+                    fields.alternateTitles.length > 0
+                  ) {
+                    const updated = fields.alternateTitles.slice(0, -1);
+                    const updatedFields = {
+                      ...fields,
+                      alternateTitles: updated,
+                    };
+                    setFields(updatedFields);
+                    trigger(updatedFields);
+                  }
+                }}
+                onBlur={() => {
+                  const trimmed = altTitleInput.trim();
+                  if (
+                    trimmed &&
+                    fields.alternateTitles.length < 10 &&
+                    !fields.alternateTitles.some(
+                      (t) => t.toLowerCase() === trimmed.toLowerCase()
+                    ) &&
+                    fields.title.toLowerCase() !== trimmed.toLowerCase()
+                  ) {
+                    const updated = [
+                      ...fields.alternateTitles,
+                      trimmed,
+                    ];
+                    const updatedFields = {
+                      ...fields,
+                      alternateTitles: updated,
+                    };
+                    setFields(updatedFields);
+                    setAltTitleInput("");
+                    trigger(updatedFields);
+                  }
+                }}
+                placeholder="Type alternate title and press Enter to add..."
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Location</Label>
+              <Input
+                value={fields.location ?? ""}
+                onChange={(e) => handleChange("location", e.target.value)}
+                onBlur={handleBlur}
+                placeholder="San Francisco, CA"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <DatePicker
+                label="Start Date"
+                value={fields.startDate}
+                onChange={(v) => {
+                  handleChange("startDate", v);
+                  trigger({ ...fields, startDate: v });
+                }}
+              />
+              <DatePicker
+                label="End Date"
+                value={fields.endDate}
+                onChange={(v) => {
+                  handleChange("endDate", v);
+                  trigger({ ...fields, endDate: v });
+                }}
+                showPresent
+                isPresent={fields.endDate === null && !!fields.startDate}
+                onPresentChange={(present) => {
+                  const val = present ? null : "";
+                  handleChange("endDate", val);
+                  trigger({ ...fields, endDate: val });
+                }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Textarea
+                value={fields.description ?? ""}
+                onChange={(e) => handleChange("description", e.target.value)}
+                onBlur={handleBlur}
+                placeholder="Led product strategy..."
+                rows={3}
+              />
+            </div>
+
+            {/* Subsections */}
+            <div className="space-y-2 pt-2">
+              <h4 className="text-sm font-medium text-muted-foreground">
+                Subsections
+              </h4>
+
+              {fields.subsections.length === 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {THINKING_PROMPTS.map((prompt) => {
+                    const Icon = prompt.icon;
+                    return (
+                      <button
+                        key={prompt.label}
+                        type="button"
+                        disabled={isCreating}
+                        onClick={() => handleAddSubsection(prompt.label)}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-sm hover:bg-muted/80 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                      >
+                        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                        {prompt.label}
+                      </button>
+                    );
+                  })}
                 </div>
-              </button>
-              <SaveIndicator status={status} />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setDeleteOpen(true)}
-                className="h-8 w-8"
+              )}
+
+              <DndContext
+                sensors={subsectionSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleSubsectionDragEnd}
               >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            {isExpanded && (
-              <CardContent className="space-y-3 pt-0">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>Company</Label>
-                    <Input
-                      value={fields.company}
-                      onChange={(e) => handleChange("company", e.target.value)}
-                      onBlur={handleBlur}
-                      placeholder="Acme Corp"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Title</Label>
-                    <Input
-                      value={fields.title}
-                      onChange={(e) => handleChange("title", e.target.value)}
-                      onBlur={handleBlur}
-                      placeholder="Senior PM"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Alternate Titles</Label>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {fields.alternateTitles.map((alt, idx) => (
-                      <Badge key={idx} variant="secondary" className="gap-1">
-                        {alt}
-                        <button
-                          onClick={() => {
-                            const updated = fields.alternateTitles.filter(
-                              (_, i) => i !== idx
-                            );
-                            const updatedFields = {
-                              ...fields,
-                              alternateTitles: updated,
-                            };
-                            setFields(updatedFields);
-                            trigger(updatedFields);
-                          }}
-                          className="ml-0.5 hover:text-destructive"
-                          aria-label={`Remove ${alt}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
+                <SortableContext
+                  items={fields.subsections.map((s) => s.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {fields.subsections.map((sub) => (
+                      <SortableSubsection
+                        key={sub.id}
+                        sub={sub}
+                        experienceId={entry.id}
+                        onSaved={handleSubsectionSaved}
+                        onDelete={() => handleDeleteSubsection(sub.id)}
+                        initialExpanded={sub.id === newlyCreatedSubId}
+                      />
                     ))}
                   </div>
-                  <Input
-                    value={altTitleInput}
-                    onChange={(e) => setAltTitleInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === ",") {
-                        e.preventDefault();
-                        const trimmed = altTitleInput.trim();
-                        if (
-                          !trimmed ||
-                          fields.alternateTitles.length >= 10 ||
-                          fields.alternateTitles.some(
-                            (t) => t.toLowerCase() === trimmed.toLowerCase()
-                          ) ||
-                          fields.title.toLowerCase() === trimmed.toLowerCase()
-                        )
-                          return;
-                        const updated = [
-                          ...fields.alternateTitles,
-                          trimmed,
-                        ];
-                        const updatedFields = {
-                          ...fields,
-                          alternateTitles: updated,
-                        };
-                        setFields(updatedFields);
-                        setAltTitleInput("");
-                        trigger(updatedFields);
-                      }
-                      if (
-                        e.key === "Backspace" &&
-                        !altTitleInput &&
-                        fields.alternateTitles.length > 0
-                      ) {
-                        const updated = fields.alternateTitles.slice(0, -1);
-                        const updatedFields = {
-                          ...fields,
-                          alternateTitles: updated,
-                        };
-                        setFields(updatedFields);
-                        trigger(updatedFields);
-                      }
-                    }}
-                    onBlur={() => {
-                      const trimmed = altTitleInput.trim();
-                      if (
-                        trimmed &&
-                        fields.alternateTitles.length < 10 &&
-                        !fields.alternateTitles.some(
-                          (t) => t.toLowerCase() === trimmed.toLowerCase()
-                        ) &&
-                        fields.title.toLowerCase() !== trimmed.toLowerCase()
-                      ) {
-                        const updated = [
-                          ...fields.alternateTitles,
-                          trimmed,
-                        ];
-                        const updatedFields = {
-                          ...fields,
-                          alternateTitles: updated,
-                        };
-                        setFields(updatedFields);
-                        setAltTitleInput("");
-                        trigger(updatedFields);
-                      }
-                    }}
-                    placeholder="Type alternate title and press Enter to add..."
-                    className="text-sm"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Location</Label>
-                  <Input
-                    value={fields.location ?? ""}
-                    onChange={(e) => handleChange("location", e.target.value)}
-                    onBlur={handleBlur}
-                    placeholder="San Francisco, CA"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <DatePicker
-                    label="Start Date"
-                    value={fields.startDate}
-                    onChange={(v) => {
-                      handleChange("startDate", v);
-                      trigger({ ...fields, startDate: v });
-                    }}
-                  />
-                  <DatePicker
-                    label="End Date"
-                    value={fields.endDate}
-                    onChange={(v) => {
-                      handleChange("endDate", v);
-                      trigger({ ...fields, endDate: v });
-                    }}
-                    showPresent
-                    isPresent={fields.endDate === null && !!fields.startDate}
-                    onPresentChange={(present) => {
-                      const val = present ? null : "";
-                      handleChange("endDate", val);
-                      trigger({ ...fields, endDate: val });
-                    }}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Description</Label>
-                  <Textarea
-                    value={fields.description ?? ""}
-                    onChange={(e) => handleChange("description", e.target.value)}
-                    onBlur={handleBlur}
-                    placeholder="Led product strategy..."
-                    rows={3}
-                  />
-                </div>
+                </SortableContext>
+              </DndContext>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleAddSubsection()}
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                Add Subsection
+              </Button>
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
-                {/* Subsections */}
-                <div className="space-y-2 pt-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">
-                    Subsections
-                  </h4>
-                  <DragDropContext onDragEnd={handleSubsectionDragEnd}>
-                    <Droppable droppableId={`subsections-${entry.id}`}>
-                      {(subProvided) => (
-                        <div
-                          ref={subProvided.innerRef}
-                          {...subProvided.droppableProps}
-                          className="space-y-2"
-                        >
-                          {fields.subsections.map((sub, subIndex) => (
-                            <Draggable
-                              key={sub.id}
-                              draggableId={sub.id}
-                              index={subIndex}
-                            >
-                              {(subDragProvided) => (
-                                <div
-                                  ref={subDragProvided.innerRef}
-                                  {...subDragProvided.draggableProps}
-                                >
-                                  <SubsectionForm
-                                    subsection={sub}
-                                    experienceId={entry.id}
-                                    onSaved={handleSubsectionSaved}
-                                    onDelete={() =>
-                                      handleDeleteSubsection(sub.id)
-                                    }
-                                    dragHandleProps={
-                                      subDragProvided.dragHandleProps
-                                    }
-                                  />
-                                </div>
-                              )}
-                            </Draggable>
-                          ))}
-                          {subProvided.placeholder}
-                        </div>
-                      )}
-                    </Droppable>
-                  </DragDropContext>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleAddSubsection}
-                  >
-                    <Plus className="mr-1 h-3.5 w-3.5" />
-                    Add Subsection
-                  </Button>
-                </div>
-              </CardContent>
-            )}
-          </Card>
-
-          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete work experience?</DialogTitle>
-                <DialogDescription>
-                  Are you sure? This will also delete all subsections. This
-                  cannot be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setDeleteOpen(false);
-                    onDelete();
-                  }}
-                >
-                  Delete
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
-    </Draggable>
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete work experience?</DialogTitle>
+            <DialogDescription>
+              Are you sure? This will also delete all subsections. This
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setDeleteOpen(false);
+                onDelete();
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 
 export function ExperienceSection({
   experiences,
   onUpdate,
+  onOpenGuide,
 }: ExperienceSectionProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [nudgeDismissed, setNudgeDismissed] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      return !!localStorage.getItem("resume-source-nudge-dismissed");
+    } catch {
+      return true;
+    }
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
 
   const toggleExpanded = (id: string) => {
     setExpanded((prev) => {
@@ -538,13 +645,18 @@ export function ExperienceSection({
     onUpdate(experiences.filter((e) => e.id !== id));
   };
 
-  const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = experiences.findIndex((e) => e.id === active.id);
+    const newIndex = experiences.findIndex((e) => e.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
     const previousOrder = [...experiences];
-    const items = Array.from(experiences);
-    const [removed] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, removed);
-    const reordered = items.map((item, i) => ({ ...item, sortOrder: i }));
+    const reordered = arrayMove(experiences, oldIndex, newIndex).map(
+      (item, i) => ({ ...item, sortOrder: i })
+    );
     onUpdate(reordered);
 
     try {
@@ -575,36 +687,74 @@ export function ExperienceSection({
         </div>
       </div>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="experiences">
-          {(provided) => (
-            <div
-              ref={provided.innerRef}
-              {...provided.droppableProps}
-              className="space-y-3"
-            >
-              {experiences.map((entry, index) => (
-                <ExperienceCard
-                  key={entry.id}
-                  entry={entry}
-                  index={index}
-                  isExpanded={expanded.has(entry.id)}
-                  onToggle={() => toggleExpanded(entry.id)}
-                  onSaved={(updated) =>
-                    onUpdate(
-                      experiences.map((e) =>
-                        e.id === updated.id ? updated : e
-                      )
-                    )
-                  }
-                  onDelete={() => handleDelete(entry.id)}
-                />
-              ))}
-              {provided.placeholder}
+      {!nudgeDismissed &&
+        experiences.length > 0 &&
+        experiences.some((e) => e.subsections.length === 0) && (
+          <div className="flex items-start gap-3 rounded-lg border bg-muted/50 p-3 text-sm">
+            <Info className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+            <div className="flex-1">
+              <p className="text-muted-foreground">
+                Organize your experience into subsections (like &ldquo;Key
+                Projects&rdquo; or &ldquo;Leadership&rdquo;) to help the AI
+                generate more targeted resumes.{" "}
+                {onOpenGuide && (
+                  <button
+                    type="button"
+                    onClick={onOpenGuide}
+                    className="text-primary underline underline-offset-2 hover:text-primary/80"
+                  >
+                    Learn more
+                  </button>
+                )}
+              </p>
             </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+            <button
+              type="button"
+              onClick={() => {
+                setNudgeDismissed(true);
+                try {
+                  localStorage.setItem("resume-source-nudge-dismissed", "true");
+                } catch {
+                  // localStorage unavailable
+                }
+              }}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+              aria-label="Dismiss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={experiences.map((e) => e.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-3">
+            {experiences.map((entry) => (
+              <ExperienceCard
+                key={entry.id}
+                entry={entry}
+                isExpanded={expanded.has(entry.id)}
+                onToggle={() => toggleExpanded(entry.id)}
+                onSaved={(updated) =>
+                  onUpdate(
+                    experiences.map((e) =>
+                      e.id === updated.id ? updated : e
+                    )
+                  )
+                }
+                onDelete={() => handleDelete(entry.id)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       <Button onClick={handleAdd} variant="outline" className="w-full">
         <Plus className="mr-1 h-4 w-4" />
