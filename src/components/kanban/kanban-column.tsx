@@ -22,10 +22,7 @@ interface KanbanColumnProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   columnDragHandleProps?: any;
   droppableProvided?: {
-    innerRef: (element: HTMLElement | null) => void;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    droppableProps: any;
-    placeholder: React.ReactNode;
+    setNodeRef: (element: HTMLElement | null) => void;
   };
   renderCard?: (app: ApplicationCardData, index: number) => React.ReactNode;
 }
@@ -82,8 +79,7 @@ export function KanbanColumn({
       />
 
       <div
-        ref={droppableProvided?.innerRef}
-        {...droppableProvided?.droppableProps}
+        ref={droppableProvided?.setNodeRef}
         className="flex-1 overflow-y-auto px-2 pb-2 space-y-3 min-h-[80px]"
       >
         {column.applications.map((app, index) =>
@@ -99,7 +95,6 @@ export function KanbanColumn({
             />
           )
         )}
-        {droppableProvided?.placeholder}
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { GripVertical, Clock, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -49,7 +48,6 @@ export function ApplicationCard({
   onClick,
   dragHandleProps,
 }: ApplicationCardProps) {
-  const isDragging = React.useRef(false);
   const compensation = getCompensationDisplay(application);
   const interviewCount = application._count.interviews;
   const resumeGrade = (() => {
@@ -80,15 +78,7 @@ export function ApplicationCard({
         staleness === "warning" && "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
       )}
       style={{ borderLeftWidth: 3, borderLeftColor: columnColor }}
-      onMouseDown={() => { isDragging.current = false; }}
-      onMouseMove={() => { isDragging.current = true; }}
-      onClick={(e) => {
-        if (isDragging.current) {
-          e.stopPropagation();
-          return;
-        }
-        onClick();
-      }}
+      onClick={onClick}
       {...dragHandleProps}
     >
       <div className="flex items-start gap-2">

@@ -14,7 +14,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Trash2, Plus, X } from "lucide-react";
 import { fetchOrThrowSaveError } from "@/lib/fetch-with-save-error";
 import type { ResumeSkill } from "@/types/resume-source";
@@ -27,12 +41,10 @@ type SkillsSectionProps = {
 
 function SkillCard({
   skill,
-  index,
   onSaved,
   onDelete,
 }: {
   skill: ResumeSkill;
-  index: number;
   onSaved: (updated: ResumeSkill) => void;
   onDelete: () => void;
 }) {
@@ -40,6 +52,19 @@ function SkillCard({
   const [items, setItems] = useState(skill.items);
   const [tagInput, setTagInput] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const {
+    setNodeRef,
+    transform,
+    transition,
+    listeners,
+    attributes,
+  } = useSortable({ id: skill.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   const saveSkill = useCallback(
     async (data: { category: string; items: string[] }) => {
@@ -88,92 +113,92 @@ function SkillCard({
   };
 
   return (
-    <Draggable draggableId={skill.id} index={index}>
-      {(provided) => (
-        <div ref={provided.innerRef} {...provided.draggableProps}>
-          <Card>
-            <CardHeader className="flex flex-row items-center gap-2 p-3">
-              <div {...provided.dragHandleProps} aria-label="Drag to reorder">
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1">
-                <Input
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  onBlur={handleCategoryBlur}
-                  placeholder="e.g., Programming Languages"
-                  className="font-medium"
-                />
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setDeleteOpen(true)}
-                className="h-8 w-8"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <Label className="sr-only">Skills</Label>
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {items.map((item, idx) => (
-                  <Badge key={idx} variant="secondary" className="gap-1">
-                    {item}
-                    <button
-                      onClick={() => removeTag(idx)}
-                      className="ml-0.5 hover:text-destructive"
-                      aria-label={`Remove ${item}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-              <Input
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onBlur={() => {
-                  if (tagInput.trim()) addTag(tagInput);
-                }}
-                placeholder="Type and press Enter or comma to add..."
-                className="text-sm"
-              />
-            </CardContent>
-          </Card>
-
-          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete skill category?</DialogTitle>
-                <DialogDescription>
-                  Are you sure? This cannot be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setDeleteOpen(false);
-                    onDelete();
-                  }}
+    <div ref={setNodeRef} style={style}>
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2 p-3">
+          <div {...listeners} {...attributes} aria-label="Drag to reorder">
+            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+          </div>
+          <div className="flex-1">
+            <Input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              onBlur={handleCategoryBlur}
+              placeholder="e.g., Programming Languages"
+              className="font-medium"
+            />
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setDeleteOpen(true)}
+            className="h-8 w-8"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <Label className="sr-only">Skills</Label>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {items.map((item, idx) => (
+              <Badge key={idx} variant="secondary" className="gap-1">
+                {item}
+                <button
+                  onClick={() => removeTag(idx)}
+                  className="ml-0.5 hover:text-destructive"
+                  aria-label={`Remove ${item}`}
                 >
-                  Delete
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
-    </Draggable>
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+          <Input
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={() => {
+              if (tagInput.trim()) addTag(tagInput);
+            }}
+            placeholder="Type and press Enter or comma to add..."
+            className="text-sm"
+          />
+        </CardContent>
+      </Card>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete skill category?</DialogTitle>
+            <DialogDescription>
+              Are you sure? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setDeleteOpen(false);
+                onDelete();
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 
 export function SkillsSection({ skills, onUpdate }: SkillsSectionProps) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
   const handleAdd = async () => {
     const res = await fetch("/api/resume-source/skills", {
       method: "POST",
@@ -199,13 +224,19 @@ export function SkillsSection({ skills, onUpdate }: SkillsSectionProps) {
     onUpdate(skills.filter((s) => s.id !== id));
   };
 
-  const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = skills.findIndex((s) => s.id === active.id);
+    const newIndex = skills.findIndex((s) => s.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
     const previousOrder = [...skills];
-    const items = Array.from(skills);
-    const [removed] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, removed);
-    const reordered = items.map((item, i) => ({ ...item, sortOrder: i }));
+    const reordered = arrayMove(skills, oldIndex, newIndex).map((item, i) => ({
+      ...item,
+      sortOrder: i,
+    }));
     onUpdate(reordered);
 
     try {
@@ -224,32 +255,31 @@ export function SkillsSection({ skills, onUpdate }: SkillsSectionProps) {
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">Skills</h2>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="skills">
-          {(provided) => (
-            <div
-              ref={provided.innerRef}
-              {...provided.droppableProps}
-              className="space-y-3"
-            >
-              {skills.map((skill, index) => (
-                <SkillCard
-                  key={skill.id}
-                  skill={skill}
-                  index={index}
-                  onSaved={(updated) =>
-                    onUpdate(
-                      skills.map((s) => (s.id === updated.id ? updated : s))
-                    )
-                  }
-                  onDelete={() => handleDelete(skill.id)}
-                />
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={skills.map((s) => s.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-3">
+            {skills.map((skill) => (
+              <SkillCard
+                key={skill.id}
+                skill={skill}
+                onSaved={(updated) =>
+                  onUpdate(
+                    skills.map((s) => (s.id === updated.id ? updated : s))
+                  )
+                }
+                onDelete={() => handleDelete(skill.id)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       <Button onClick={handleAdd} variant="outline" className="w-full">
         <Plus className="mr-1 h-4 w-4" />

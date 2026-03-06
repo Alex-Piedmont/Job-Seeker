@@ -14,7 +14,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, ChevronDown, ChevronRight, Trash2, Plus, ChevronsUpDown } from "lucide-react";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { SaveIndicator } from "./save-indicator";
@@ -30,14 +44,12 @@ type EducationSectionProps = {
 
 function EducationCard({
   entry,
-  index,
   isExpanded,
   onToggle,
   onSaved,
   onDelete,
 }: {
   entry: ResumeEducation;
-  index: number;
   isExpanded: boolean;
   onToggle: () => void;
   onSaved: (updated: ResumeEducation) => void;
@@ -45,6 +57,19 @@ function EducationCard({
 }) {
   const [fields, setFields] = useState(entry);
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const {
+    setNodeRef,
+    transform,
+    transition,
+    listeners,
+    attributes,
+  } = useSortable({ id: entry.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   const saveEntry = useCallback(
     async (data: ResumeEducation) => {
@@ -89,155 +114,155 @@ function EducationCard({
       : fields.institution || fields.degree || "New Education Entry";
 
   return (
-    <Draggable draggableId={entry.id} index={index}>
-      {(provided) => (
-        <div ref={provided.innerRef} {...provided.draggableProps}>
-          <Card>
-            <CardHeader className="flex flex-row items-center gap-2 p-3">
-              <div {...provided.dragHandleProps} aria-label="Drag to reorder">
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <button
-                onClick={onToggle}
-                className="flex flex-1 items-center gap-2 text-left text-sm font-medium"
-              >
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-                {title}
-              </button>
-              <SaveIndicator status={status} />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setDeleteOpen(true)}
-                className="h-8 w-8"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            {isExpanded && (
-              <CardContent className="space-y-3 pt-0">
-                <div className="space-y-1.5">
-                  <Label>Institution</Label>
-                  <Input
-                    value={fields.institution}
-                    onChange={(e) => handleChange("institution", e.target.value)}
-                    onBlur={handleBlur}
-                    placeholder="MIT"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Degree</Label>
-                  <Input
-                    value={fields.degree}
-                    onChange={(e) => handleChange("degree", e.target.value)}
-                    onBlur={handleBlur}
-                    placeholder="Bachelor of Science"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Field of Study</Label>
-                  <Input
-                    value={fields.fieldOfStudy ?? ""}
-                    onChange={(e) => handleChange("fieldOfStudy", e.target.value)}
-                    onBlur={handleBlur}
-                    placeholder="Computer Science"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <DatePicker
-                    label="Start Date"
-                    value={fields.startDate}
-                    onChange={(v) => {
-                      handleChange("startDate", v);
-                      trigger({ ...fields, startDate: v });
-                    }}
-                  />
-                  <DatePicker
-                    label="End Date"
-                    value={fields.endDate}
-                    onChange={(v) => {
-                      handleChange("endDate", v);
-                      trigger({ ...fields, endDate: v });
-                    }}
-                    showPresent
-                    isPresent={fields.endDate === null && !!fields.startDate}
-                    onPresentChange={(present) => {
-                      const val = present ? null : "";
-                      handleChange("endDate", val);
-                      trigger({ ...fields, endDate: val });
-                    }}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>GPA</Label>
-                    <Input
-                      value={fields.gpa ?? ""}
-                      onChange={(e) => handleChange("gpa", e.target.value)}
-                      onBlur={handleBlur}
-                      placeholder="3.8/4.0"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Honors</Label>
-                    <Input
-                      value={fields.honors ?? ""}
-                      onChange={(e) => handleChange("honors", e.target.value)}
-                      onBlur={handleBlur}
-                      placeholder="magna cum laude"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Notes</Label>
-                  <Textarea
-                    value={fields.notes ?? ""}
-                    onChange={(e) => handleChange("notes", e.target.value)}
-                    onBlur={handleBlur}
-                    placeholder="Additional notes..."
-                    rows={3}
-                  />
-                </div>
-              </CardContent>
+    <div ref={setNodeRef} style={style}>
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2 p-3">
+          <div {...listeners} {...attributes} aria-label="Drag to reorder">
+            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+          </div>
+          <button
+            onClick={onToggle}
+            className="flex flex-1 items-center gap-2 text-left text-sm font-medium"
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
             )}
-          </Card>
+            {title}
+          </button>
+          <SaveIndicator status={status} />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setDeleteOpen(true)}
+            className="h-8 w-8"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </CardHeader>
+        {isExpanded && (
+          <CardContent className="space-y-3 pt-0">
+            <div className="space-y-1.5">
+              <Label>Institution</Label>
+              <Input
+                value={fields.institution}
+                onChange={(e) => handleChange("institution", e.target.value)}
+                onBlur={handleBlur}
+                placeholder="MIT"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Degree</Label>
+              <Input
+                value={fields.degree}
+                onChange={(e) => handleChange("degree", e.target.value)}
+                onBlur={handleBlur}
+                placeholder="Bachelor of Science"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Field of Study</Label>
+              <Input
+                value={fields.fieldOfStudy ?? ""}
+                onChange={(e) => handleChange("fieldOfStudy", e.target.value)}
+                onBlur={handleBlur}
+                placeholder="Computer Science"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <DatePicker
+                label="Start Date"
+                value={fields.startDate}
+                onChange={(v) => {
+                  handleChange("startDate", v);
+                  trigger({ ...fields, startDate: v });
+                }}
+              />
+              <DatePicker
+                label="End Date"
+                value={fields.endDate}
+                onChange={(v) => {
+                  handleChange("endDate", v);
+                  trigger({ ...fields, endDate: v });
+                }}
+                showPresent
+                isPresent={fields.endDate === null && !!fields.startDate}
+                onPresentChange={(present) => {
+                  const val = present ? null : "";
+                  handleChange("endDate", val);
+                  trigger({ ...fields, endDate: val });
+                }}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>GPA</Label>
+                <Input
+                  value={fields.gpa ?? ""}
+                  onChange={(e) => handleChange("gpa", e.target.value)}
+                  onBlur={handleBlur}
+                  placeholder="3.8/4.0"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Honors</Label>
+                <Input
+                  value={fields.honors ?? ""}
+                  onChange={(e) => handleChange("honors", e.target.value)}
+                  onBlur={handleBlur}
+                  placeholder="magna cum laude"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notes</Label>
+              <Textarea
+                value={fields.notes ?? ""}
+                onChange={(e) => handleChange("notes", e.target.value)}
+                onBlur={handleBlur}
+                placeholder="Additional notes..."
+                rows={3}
+              />
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
-          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete education entry?</DialogTitle>
-                <DialogDescription>
-                  Are you sure? This cannot be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setDeleteOpen(false);
-                    onDelete();
-                  }}
-                >
-                  Delete
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
-    </Draggable>
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete education entry?</DialogTitle>
+            <DialogDescription>
+              Are you sure? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setDeleteOpen(false);
+                onDelete();
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 
 export function EducationSection({ education, onUpdate }: EducationSectionProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
 
   const toggleExpanded = (id: string) => {
     setExpanded((prev) => {
@@ -278,13 +303,18 @@ export function EducationSection({ education, onUpdate }: EducationSectionProps)
     onUpdate(education.filter((e) => e.id !== id));
   };
 
-  const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = education.findIndex((e) => e.id === active.id);
+    const newIndex = education.findIndex((e) => e.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
     const previousOrder = [...education];
-    const items = Array.from(education);
-    const [removed] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, removed);
-    const reordered = items.map((item, i) => ({ ...item, sortOrder: i }));
+    const reordered = arrayMove(education, oldIndex, newIndex).map(
+      (item, i) => ({ ...item, sortOrder: i })
+    );
     onUpdate(reordered);
 
     try {
@@ -313,34 +343,33 @@ export function EducationSection({ education, onUpdate }: EducationSectionProps)
         </div>
       </div>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="education">
-          {(provided) => (
-            <div
-              ref={provided.innerRef}
-              {...provided.droppableProps}
-              className="space-y-3"
-            >
-              {education.map((entry, index) => (
-                <EducationCard
-                  key={entry.id}
-                  entry={entry}
-                  index={index}
-                  isExpanded={expanded.has(entry.id)}
-                  onToggle={() => toggleExpanded(entry.id)}
-                  onSaved={(updated) =>
-                    onUpdate(
-                      education.map((e) => (e.id === updated.id ? updated : e))
-                    )
-                  }
-                  onDelete={() => handleDelete(entry.id)}
-                />
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={education.map((e) => e.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-3">
+            {education.map((entry) => (
+              <EducationCard
+                key={entry.id}
+                entry={entry}
+                isExpanded={expanded.has(entry.id)}
+                onToggle={() => toggleExpanded(entry.id)}
+                onSaved={(updated) =>
+                  onUpdate(
+                    education.map((e) => (e.id === updated.id ? updated : e))
+                  )
+                }
+                onDelete={() => handleDelete(entry.id)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       <Button onClick={handleAdd} variant="outline" className="w-full">
         <Plus className="mr-1 h-4 w-4" />
