@@ -19,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -197,6 +198,7 @@ export function JobSourcesTab() {
   }
 
   return (
+    <TooltipProvider>
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
@@ -397,5 +399,6 @@ export function JobSourcesTab() {
         </DialogContent>
       </Dialog>
     </div>
+    </TooltipProvider>
   );
 }
