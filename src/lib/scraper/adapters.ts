@@ -243,7 +243,10 @@ function extractSalaryFromHtml(html: string): { min: number | null; max: number 
   return { min, max };
 }
 
-export async function scrapeWorkday(company: { name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
+export async function scrapeWorkday(
+  company: { name: string; baseUrl: string },
+  onJob?: (job: ScrapedJobData) => Promise<void>,
+): Promise<ScrapedJobData[]> {
   const { host, tenant, siteId } = parseWorkdayUrl(company.baseUrl);
   const listUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/jobs`;
 
@@ -294,7 +297,7 @@ export async function scrapeWorkday(company: { name: string; baseUrl: string }):
         const locationType = inferLocationType(locations.join(", "));
         const salary = extractSalaryFromHtml(info.jobDescription ?? "");
 
-        jobs.push({
+        const job: ScrapedJobData = {
           externalJobId: info.jobReqId ?? posting.externalPath,
           title: info.title ?? posting.title,
           url: `https://${host}/en-US/${siteId}/job/${posting.externalPath}`,
@@ -305,7 +308,10 @@ export async function scrapeWorkday(company: { name: string; baseUrl: string }):
           salaryMax: salary.max,
           salaryCurrency: "USD",
           jobDescriptionHtml: info.jobDescription ?? "",
-        });
+        };
+
+        jobs.push(job);
+        if (onJob) await onJob(job);
       } catch (err) {
         console.warn(`[workday] Detail fetch error for ${posting.externalPath}:`, err);
       }

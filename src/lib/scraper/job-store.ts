@@ -48,6 +48,57 @@ export interface UpsertResult {
   removed: number;
 }
 
+export async function upsertJob(
+  companyId: string,
+  job: ScrapedJobData,
+): Promise<void> {
+  const now = new Date();
+  const jobDescriptionMd = htmlToMarkdown(job.jobDescriptionHtml);
+
+  const existing = await prisma.scrapedJob.findUnique({
+    where: {
+      companyId_externalJobId: { companyId, externalJobId: job.externalJobId },
+    },
+  });
+
+  if (existing) {
+    await prisma.scrapedJob.update({
+      where: { id: existing.id },
+      data: {
+        title: job.title,
+        url: job.url,
+        department: job.department,
+        locations: job.locations,
+        locationType: job.locationType,
+        salaryMin: job.salaryMin,
+        salaryMax: job.salaryMax,
+        salaryCurrency: job.salaryCurrency,
+        jobDescriptionMd,
+        lastSeenAt: now,
+        removedAt: null,
+      },
+    });
+  } else {
+    await prisma.scrapedJob.create({
+      data: {
+        companyId,
+        externalJobId: job.externalJobId,
+        title: job.title,
+        url: job.url,
+        department: job.department,
+        locations: job.locations,
+        locationType: job.locationType,
+        salaryMin: job.salaryMin,
+        salaryMax: job.salaryMax,
+        salaryCurrency: job.salaryCurrency,
+        jobDescriptionMd,
+        firstSeenAt: now,
+        lastSeenAt: now,
+      },
+    });
+  }
+}
+
 export async function upsertJobs(
   companyId: string,
   scrapedJobs: ScrapedJobData[],

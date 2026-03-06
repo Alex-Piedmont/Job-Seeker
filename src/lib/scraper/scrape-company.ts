@@ -7,12 +7,11 @@
 import { prisma } from "@/lib/prisma";
 import { scrapeGreenhouse, scrapeLever, scrapeWorkday } from "./adapters";
 import type { ScrapedJobData } from "./adapters";
-import { upsertJobs } from "./job-store";
+import { upsertJob, upsertJobs } from "./job-store";
 
-const scraperByPlatform: Record<string, (company: { name: string; baseUrl: string }) => Promise<ScrapedJobData[]>> = {
+const batchScrapers: Record<string, (company: { name: string; baseUrl: string }) => Promise<ScrapedJobData[]>> = {
   GREENHOUSE: scrapeGreenhouse,
   LEVER: scrapeLever,
-  WORKDAY: scrapeWorkday,
 };
 
 export async function scrapeCompany(company: {
@@ -21,8 +20,10 @@ export async function scrapeCompany(company: {
   baseUrl: string;
   atsPlatform: string;
 }): Promise<void> {
-  const scraper = scraperByPlatform[company.atsPlatform];
-  if (!scraper) {
+  const batchScraper = batchScrapers[company.atsPlatform];
+  const isWorkday = company.atsPlatform === "WORKDAY";
+
+  if (!batchScraper && !isWorkday) {
     console.log(
       `[scrape] Skipping initial scrape for ${company.name} — ` +
       `${company.atsPlatform} requires Playwright (will scrape on next cron run)`,
@@ -35,15 +36,27 @@ export async function scrapeCompany(company: {
   let error: string | null = null;
 
   try {
-    const jobs = await scraper(company);
+    if (isWorkday) {
+      // Stream jobs to DB one at a time so partial results survive timeouts
+      let count = 0;
+      await scrapeWorkday(company, async (job) => {
+        await upsertJob(company.id, job);
+        count++;
+      });
 
-    const result = await upsertJobs(company.id, jobs);
+      console.log(
+        `[scrape] ${company.name} complete — ${count} jobs upserted (${Date.now() - startTime}ms)`,
+      );
+    } else {
+      const jobs = await batchScraper!(company);
+      const result = await upsertJobs(company.id, jobs);
 
-    console.log(
-      `[scrape] ${company.name} complete — ` +
-      `${jobs.length} found, ${result.added} added, ${result.updated} updated, ` +
-      `${result.removed} removed (${Date.now() - startTime}ms)`,
-    );
+      console.log(
+        `[scrape] ${company.name} complete — ` +
+        `${jobs.length} found, ${result.added} added, ${result.updated} updated, ` +
+        `${result.removed} removed (${Date.now() - startTime}ms)`,
+      );
+    }
   } catch (err) {
     status = "FAILURE";
     error = err instanceof Error ? err.message : String(err);
