@@ -24,6 +24,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
+    "@types/turndown": "^5.0.6",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.3",
     "class-variance-authority": "^0.7.1",
@@ -44,6 +45,7 @@
     "recharts": "^3.7.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
+    "turndown": "^7.2.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
