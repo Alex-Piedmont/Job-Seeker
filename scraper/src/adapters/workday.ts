@@ -35,8 +35,21 @@ function extractSalaryFromHtml(html: string): { min: number | null; max: number 
 // CXS API types
 // ---------------------------------------------------------------------------
 
+interface CxsFacetValue {
+  descriptor: string;
+  id: string;
+  count: number;
+}
+
+interface CxsFacet {
+  facetParameter: string;
+  descriptor: string;
+  values: CxsFacetValue[];
+}
+
 interface CxsListResponse {
   total: number;
+  facets?: CxsFacet[];
   jobPostings: Array<{
     title: string;
     externalPath: string;
@@ -70,6 +83,29 @@ export class WorkdayAdapter implements AtsAdapter {
     const { host, tenant, siteId } = parseWorkdayUrl(company.baseUrl);
     const listUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/jobs`;
 
+    // Discover full-time facet ID with an initial probe request
+    const appliedFacets: Record<string, string[]> = { locationCountry: [US_COUNTRY_FACET_ID] };
+
+    const probeRes = await fetch(listUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "User-Agent": config.userAgent },
+      body: JSON.stringify({ appliedFacets: {}, limit: 1, offset: 0, searchText: "" }),
+    });
+
+    if (probeRes.ok) {
+      const probeData = (await probeRes.json()) as CxsListResponse;
+      const timeTypeFacet = probeData.facets?.find((f) => f.facetParameter === "timeType");
+      const fullTimeValue = timeTypeFacet?.values.find((v) => v.descriptor.toLowerCase().includes("full time"));
+      if (fullTimeValue) {
+        appliedFacets.timeType = [fullTimeValue.id];
+        logger.info("Workday full-time facet discovered", { company: company.name, id: fullTimeValue.id });
+      } else {
+        logger.info("Workday timeType facet not available", { company: company.name });
+      }
+    }
+
+    await delay(config.delays.betweenRequests);
+
     const jobs: ScrapedJobData[] = [];
     let offset = 0;
     let totalJobs = -1; // capture from first response only
@@ -86,7 +122,7 @@ export class WorkdayAdapter implements AtsAdapter {
           "User-Agent": config.userAgent,
         },
         body: JSON.stringify({
-          appliedFacets: { locationCountry: [US_COUNTRY_FACET_ID] },
+          appliedFacets,
           limit,
           offset,
           searchText: "",
