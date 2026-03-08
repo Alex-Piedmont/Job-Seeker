@@ -20,15 +20,20 @@ function parseWorkdayUrl(baseUrl: string): { host: string; tenant: string; siteI
   return { host: url.host, tenant, siteId };
 }
 
+/** Threshold below which parsed salary values are assumed to be hourly rates. */
+const HOURLY_RATE_THRESHOLD = 1000;
+
 /** Best-effort salary extraction from Workday HTML description. */
-function extractSalaryFromHtml(html: string): { min: number | null; max: number | null } {
+function extractSalaryFromHtml(html: string): { min: number | null; max: number | null; isHourly: boolean } {
   // Common patterns: "Pay Range: $80,000 - $120,000", "$80,000.00 to $120,000.00"
   const match = html.match(/\$\s*([\d,]+(?:\.\d+)?)\s*(?:[-–—]|to)\s*\$\s*([\d,]+(?:\.\d+)?)/i);
-  if (!match) return { min: null, max: null };
+  if (!match) return { min: null, max: null, isHourly: false };
   const min = parseFloat(match[1].replace(/,/g, ""));
   const max = parseFloat(match[2].replace(/,/g, ""));
-  if (isNaN(min) || isNaN(max)) return { min: null, max: null };
-  return { min, max };
+  if (isNaN(min) || isNaN(max)) return { min: null, max: null, isHourly: false };
+  // Values under threshold are hourly rates (e.g. $20.82 - $37.45)
+  const isHourly = max < HOURLY_RATE_THRESHOLD;
+  return { min, max, isHourly };
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +190,11 @@ export class WorkdayAdapter implements AtsAdapter {
             locationText.includes("hybrid") ? "Hybrid" : null;
 
           const salary = extractSalaryFromHtml(info.jobDescription ?? "");
+
+          if (salary.isHourly) {
+            logger.info("Skipping hourly role", { company: company.name, title: info.title, salaryMax: salary.max });
+            continue;
+          }
 
           jobs.push({
             externalJobId: info.jobReqId ?? posting.externalPath,
