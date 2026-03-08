@@ -1,8 +1,8 @@
 [build]
-buildCommand = "npm install && npx prisma generate && cd scraper && npm install && npm run build"
+buildCommand = "npm install && npx prisma generate && cd scraper && npm install"
 
 [deploy]
-startCommand = "node scraper/dist/scraper/src/index.js"
+startCommand = "cd scraper && npx tsx src/index.ts"
 
 [[cron]]
 schedule = "0 13 * * *"
