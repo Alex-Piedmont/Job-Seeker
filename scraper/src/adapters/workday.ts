@@ -68,12 +68,16 @@ interface CxsDetailResponse {
   jobPostingInfo: {
     jobReqId?: string;
     externalPath: string;
+    externalUrl?: string;
     title: string;
     location: string;
     additionalLocations?: string[];
     jobDescription: string;  // HTML
     timeType?: string;
     jobFamilyGroup?: string;
+    startDate?: string;      // ISO date, e.g. "2026-03-08"
+    endDate?: string;        // ISO date when listing expires
+    country?: { id: string; descriptor: string };
   };
 }
 
@@ -197,6 +201,12 @@ export class WorkdayAdapter implements AtsAdapter {
           const detail = (await detailRes.json()) as CxsDetailResponse;
           const info = detail.jobPostingInfo;
 
+          // Secondary US validation via country object
+          if (info.country && info.country.id !== US_COUNTRY_FACET_ID) {
+            logger.info("Skipping non-US job", { company: company.name, title: info.title, country: info.country.descriptor });
+            continue;
+          }
+
           const locations = [info.location, ...(info.additionalLocations ?? [])].filter(Boolean);
           const locationText = locations.join(", ").toLowerCase();
           const locationType = locationText.includes("remote") ? "Remote" :
@@ -212,7 +222,7 @@ export class WorkdayAdapter implements AtsAdapter {
           jobs.push({
             externalJobId: info.jobReqId ?? posting.externalPath,
             title: info.title ?? posting.title,
-            url: `https://${host}/en-US/${siteId}/job/${path}`,
+            url: info.externalUrl ?? `https://${host}/en-US/${siteId}/job/${path}`,
             department: info.jobFamilyGroup ?? null,
             locations,
             locationType,
@@ -220,6 +230,8 @@ export class WorkdayAdapter implements AtsAdapter {
             salaryMax: salary.max,
             salaryCurrency: "USD",
             jobDescriptionHtml: info.jobDescription ?? "",
+            postedAt: info.startDate ?? null,
+            postingEndDate: info.endDate ?? null,
           });
         } catch (err) {
           logger.warn("Workday detail fetch error", {

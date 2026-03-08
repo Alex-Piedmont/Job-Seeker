@@ -13,6 +13,7 @@ const baseJob: ScrapedJob = {
   salaryMax: 200000,
   salaryCurrency: "USD",
   firstSeenAt: new Date().toISOString(),
+  postingEndDate: null,
   removedAt: null,
   archivedAt: null,
   company: { id: "c1", name: "Acme Corp" },

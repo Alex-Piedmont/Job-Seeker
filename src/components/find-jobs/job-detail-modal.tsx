@@ -141,6 +141,16 @@ export function JobDetailModal({ jobId, onClose, onToggleArchive, importedJobIds
             {" "}({format(new Date(job.firstSeenAt), "MMM d, yyyy")})
           </span>
         </div>
+        {job.postingEndDate && (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="h-4 w-4" />
+            <span>
+              {new Date(job.postingEndDate) < new Date()
+                ? `Listing expired ${format(new Date(job.postingEndDate), "MMM d, yyyy")}`
+                : `Apply by ${format(new Date(job.postingEndDate), "MMM d, yyyy")}`}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">

@@ -9,6 +9,8 @@ export interface ScrapedJobData {
   salaryMax: number | null;
   salaryCurrency: string;
   jobDescriptionHtml: string;
+  postedAt: string | null;       // ISO date string from ATS (e.g. "2026-03-08")
+  postingEndDate: string | null;  // ISO date string when listing expires
 }
 
 export interface AtsAdapter {

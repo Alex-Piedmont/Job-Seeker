@@ -23,6 +23,8 @@ export interface ScrapedJobData {
   salaryMax: number | null;
   salaryCurrency: string;
   jobDescriptionHtml: string;
+  postedAt: string | null;       // ISO date string from ATS (e.g. "2026-03-08")
+  postingEndDate: string | null;  // ISO date string when listing expires
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +165,8 @@ export async function scrapeGreenhouse(company: { name: string; baseUrl: string 
         salaryMax: salaryData.max,
         salaryCurrency: "USD",
         jobDescriptionHtml: job.content ?? "",
+        postedAt: null,
+        postingEndDate: null,
       });
     }
 
@@ -221,11 +225,15 @@ interface CxsDetailResponse {
   jobPostingInfo: {
     jobReqId?: string;
     externalPath: string;
+    externalUrl?: string;
     title: string;
     location: string;
     additionalLocations?: string[];
     jobDescription: string;
     jobFamilyGroup?: string;
+    startDate?: string;
+    endDate?: string;
+    country?: { id: string; descriptor: string };
   };
 }
 
@@ -348,6 +356,9 @@ export async function scrapeWorkday(
         const detail = (await detailRes.json()) as CxsDetailResponse;
         const info = detail.jobPostingInfo;
 
+        // Secondary US validation via country object
+        if (info.country && info.country.id !== US_COUNTRY_FACET_ID) continue;
+
         const locations = [info.location, ...(info.additionalLocations ?? [])].filter(Boolean);
         const locationType = inferLocationType(locations.join(", "));
         const salary = extractSalaryFromHtml(info.jobDescription ?? "");
@@ -357,7 +368,7 @@ export async function scrapeWorkday(
         const job: ScrapedJobData = {
           externalJobId: info.jobReqId ?? posting.externalPath,
           title: info.title ?? posting.title,
-          url: `https://${host}/en-US/${siteId}/job/${path}`,
+          url: info.externalUrl ?? `https://${host}/en-US/${siteId}/job/${path}`,
           department: info.jobFamilyGroup ?? null,
           locations,
           locationType,
@@ -365,6 +376,8 @@ export async function scrapeWorkday(
           salaryMax: salary.max,
           salaryCurrency: "USD",
           jobDescriptionHtml: info.jobDescription ?? "",
+          postedAt: info.startDate ?? null,
+          postingEndDate: info.endDate ?? null,
         };
 
         jobs.push(job);
@@ -415,6 +428,8 @@ export async function scrapeLever(company: { name: string; baseUrl: string }): P
       salaryMax: posting.salaryRange?.max ?? null,
       salaryCurrency: posting.salaryRange?.currency ?? "USD",
       jobDescriptionHtml: posting.description ?? posting.descriptionPlain ?? "",
+      postedAt: null,
+      postingEndDate: null,
     });
   }
 

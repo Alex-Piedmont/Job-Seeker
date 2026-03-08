@@ -74,6 +74,7 @@ export async function upsertJob(
         salaryMax: job.salaryMax,
         salaryCurrency: job.salaryCurrency,
         jobDescriptionMd,
+        postingEndDate: job.postingEndDate ? new Date(job.postingEndDate) : null,
         lastSeenAt: now,
         removedAt: null,
       },
@@ -92,8 +93,9 @@ export async function upsertJob(
         salaryMax: job.salaryMax,
         salaryCurrency: job.salaryCurrency,
         jobDescriptionMd,
-        firstSeenAt: now,
+        firstSeenAt: job.postedAt ? new Date(job.postedAt) : now,
         lastSeenAt: now,
+        postingEndDate: job.postingEndDate ? new Date(job.postingEndDate) : null,
       },
     });
   }
@@ -135,6 +137,7 @@ export async function upsertJobs(
           salaryMax: job.salaryMax,
           salaryCurrency: job.salaryCurrency,
           jobDescriptionMd,
+          postingEndDate: job.postingEndDate ? new Date(job.postingEndDate) : null,
           lastSeenAt: now,
           removedAt: null,
         },
@@ -154,8 +157,9 @@ export async function upsertJobs(
           salaryMax: job.salaryMax,
           salaryCurrency: job.salaryCurrency,
           jobDescriptionMd,
-          firstSeenAt: now,
+          firstSeenAt: job.postedAt ? new Date(job.postedAt) : now,
           lastSeenAt: now,
+          postingEndDate: job.postingEndDate ? new Date(job.postingEndDate) : null,
         },
       });
       added++;

@@ -18,6 +18,7 @@ export interface ScrapedJob {
   salaryMax: number | null;
   salaryCurrency: string;
   firstSeenAt: string;
+  postingEndDate: string | null;
   removedAt: string | null;
   archivedAt: string | null;
   company: { id: string; name: string };
