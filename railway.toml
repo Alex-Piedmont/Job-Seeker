@@ -1,3 +1,6 @@
+[build]
+buildCommand = "npm install && npx prisma generate && cd scraper && npm install && npm run build"
+
 [deploy]
 startCommand = "node scraper/dist/index.js"
 
