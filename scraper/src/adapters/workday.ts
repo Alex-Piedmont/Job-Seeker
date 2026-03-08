@@ -99,11 +99,24 @@ export class WorkdayAdapter implements AtsAdapter {
 
     if (probeRes.ok) {
       const probeData = (await probeRes.json()) as CxsListResponse;
-      const facets = probeData.facets ?? [];
+
+      // Flatten facets — some tenants nest country/city inside locationMainGroup
+      const facets: CxsFacet[] = [];
+      for (const f of probeData.facets ?? []) {
+        if (f.values?.length && f.values[0]?.id != null) {
+          facets.push(f);
+        }
+        // Check for nested facets (e.g. locationMainGroup contains locationCountry)
+        for (const child of f.values ?? []) {
+          if ("facetParameter" in child && "values" in child) {
+            facets.push(child as unknown as CxsFacet);
+          }
+        }
+      }
 
       // Auto-discover country facet (parameter name varies: locationCountry vs Location_Country)
       const countryFacet = facets.find((f) => f.facetParameter.toLowerCase().includes("country"));
-      const usValue = countryFacet?.values.find((v) => v.id === US_COUNTRY_FACET_ID);
+      const usValue = countryFacet?.values?.find((v) => v.id === US_COUNTRY_FACET_ID);
       if (countryFacet && usValue) {
         appliedFacets[countryFacet.facetParameter] = [usValue.id];
         logger.info("Workday US country facet discovered", { company: company.name, param: countryFacet.facetParameter });
@@ -113,7 +126,7 @@ export class WorkdayAdapter implements AtsAdapter {
 
       // Auto-discover full-time facet
       const timeTypeFacet = facets.find((f) => f.facetParameter === "timeType");
-      const fullTimeValue = timeTypeFacet?.values.find((v) => v.descriptor.toLowerCase().includes("full time"));
+      const fullTimeValue = timeTypeFacet?.values?.find((v) => v.descriptor.toLowerCase().includes("full time"));
       if (fullTimeValue) {
         appliedFacets.timeType = [fullTimeValue.id];
         logger.info("Workday full-time facet discovered", { company: company.name, id: fullTimeValue.id });

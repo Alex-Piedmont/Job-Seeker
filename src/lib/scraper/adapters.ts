@@ -268,18 +268,31 @@ export async function scrapeWorkday(
 
   if (probeRes.ok) {
     const probeData = (await probeRes.json()) as CxsListResponse;
-    const facets = probeData.facets ?? [];
+
+    // Flatten facets — some tenants nest country/city inside locationMainGroup
+    type Facet = NonNullable<CxsListResponse["facets"]>[number];
+    const facets: Facet[] = [];
+    for (const f of probeData.facets ?? []) {
+      if (f.values?.length && f.values[0]?.id != null) {
+        facets.push(f);
+      }
+      for (const child of f.values ?? []) {
+        if ("facetParameter" in child && "values" in child) {
+          facets.push(child as unknown as Facet);
+        }
+      }
+    }
 
     // Auto-discover country facet (parameter name varies: locationCountry vs Location_Country)
     const countryFacet = facets.find((f) => f.facetParameter.toLowerCase().includes("country"));
-    const usValue = countryFacet?.values.find((v) => v.id === US_COUNTRY_FACET_ID);
+    const usValue = countryFacet?.values?.find((v) => v.id === US_COUNTRY_FACET_ID);
     if (countryFacet && usValue) {
       appliedFacets[countryFacet.facetParameter] = [usValue.id];
     }
 
     // Auto-discover full-time facet
     const timeTypeFacet = facets.find((f) => f.facetParameter === "timeType");
-    const fullTimeValue = timeTypeFacet?.values.find((v) => v.descriptor.toLowerCase().includes("full time"));
+    const fullTimeValue = timeTypeFacet?.values?.find((v) => v.descriptor.toLowerCase().includes("full time"));
     if (fullTimeValue) {
       appliedFacets.timeType = [fullTimeValue.id];
     }
