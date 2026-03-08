@@ -254,8 +254,8 @@ export async function scrapeWorkday(
   const { host, tenant, siteId } = parseWorkdayUrl(company.baseUrl);
   const listUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/jobs`;
 
-  // Discover full-time facet ID with an initial probe request
-  const appliedFacets: Record<string, string[]> = { locationCountry: [US_COUNTRY_FACET_ID] };
+  // Discover facets with an initial probe request
+  const appliedFacets: Record<string, string[]> = {};
 
   const probeRes = await fetch(listUrl, {
     method: "POST",
@@ -265,7 +265,17 @@ export async function scrapeWorkday(
 
   if (probeRes.ok) {
     const probeData = (await probeRes.json()) as CxsListResponse;
-    const timeTypeFacet = probeData.facets?.find((f) => f.facetParameter === "timeType");
+    const facets = probeData.facets ?? [];
+
+    // Auto-discover country facet (parameter name varies: locationCountry vs Location_Country)
+    const countryFacet = facets.find((f) => f.facetParameter.toLowerCase().includes("country"));
+    const usValue = countryFacet?.values.find((v) => v.id === US_COUNTRY_FACET_ID);
+    if (countryFacet && usValue) {
+      appliedFacets[countryFacet.facetParameter] = [usValue.id];
+    }
+
+    // Auto-discover full-time facet
+    const timeTypeFacet = facets.find((f) => f.facetParameter === "timeType");
     const fullTimeValue = timeTypeFacet?.values.find((v) => v.descriptor.toLowerCase().includes("full time"));
     if (fullTimeValue) {
       appliedFacets.timeType = [fullTimeValue.id];
