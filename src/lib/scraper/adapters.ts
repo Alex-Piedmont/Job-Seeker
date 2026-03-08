@@ -252,6 +252,7 @@ export async function scrapeWorkday(
 
   const jobs: ScrapedJobData[] = [];
   let offset = 0;
+  let totalJobs = -1;
   const limit = 20;
 
   while (true) {
@@ -275,6 +276,9 @@ export async function scrapeWorkday(
 
     const data = (await listRes.json()) as CxsListResponse;
     if (!data.jobPostings || data.jobPostings.length === 0) break;
+
+    // Capture total from first response (subsequent pages may return 0)
+    if (totalJobs < 0) totalJobs = data.total;
 
     for (const posting of data.jobPostings) {
       try {
@@ -319,7 +323,7 @@ export async function scrapeWorkday(
     }
 
     offset += data.jobPostings.length;
-    if (offset >= data.total) break;
+    if (offset >= totalJobs) break;
 
     await delay(BETWEEN_REQUESTS_MS);
   }

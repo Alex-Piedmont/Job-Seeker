@@ -72,6 +72,7 @@ export class WorkdayAdapter implements AtsAdapter {
 
     const jobs: ScrapedJobData[] = [];
     let offset = 0;
+    let totalJobs = -1; // capture from first response only
     const limit = 20;
 
     logger.info("Starting Workday CXS scrape", { company: company.name, listUrl });
@@ -99,6 +100,12 @@ export class WorkdayAdapter implements AtsAdapter {
       const data = (await listRes.json()) as CxsListResponse;
 
       if (!data.jobPostings || data.jobPostings.length === 0) break;
+
+      // Capture total from first response (subsequent pages may return 0)
+      if (totalJobs < 0) {
+        totalJobs = data.total;
+        logger.info("Workday total jobs reported", { company: company.name, total: totalJobs });
+      }
 
       // Fetch detail for each job
       for (const posting of data.jobPostings) {
@@ -152,7 +159,7 @@ export class WorkdayAdapter implements AtsAdapter {
       }
 
       offset += data.jobPostings.length;
-      if (offset >= data.total) break;
+      if (offset >= totalJobs) break;
 
       await delay(config.delays.betweenRequests);
     }
