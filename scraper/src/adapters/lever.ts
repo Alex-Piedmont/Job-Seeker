@@ -10,9 +10,13 @@ interface LeverPosting {
   categories: {
     location?: string;
     team?: string;
+    department?: string;
+    allLocations?: string[];
   };
   description?: string;
   descriptionPlain?: string;
+  createdAt?: number;
+  workplaceType?: string;
   salaryRange?: {
     min?: number;
     max?: number;
@@ -20,9 +24,17 @@ interface LeverPosting {
   };
 }
 
+/** Extract the company slug from a Lever baseUrl (e.g. "https://jobs.lever.co/spotify" → "spotify"). */
+function extractSlug(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  const segments = url.pathname.split("/").filter(Boolean);
+  return segments[segments.length - 1];
+}
+
 export class LeverAdapter implements AtsAdapter {
   async listJobs(company: { id: string; name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
-    const url = `${company.baseUrl}?mode=json`;
+    const slug = extractSlug(company.baseUrl);
+    const url = `https://api.lever.co/v0/postings/${slug}`;
     logger.info("Fetching Lever jobs", { company: company.name, url });
 
     const response = await fetch(url, {
@@ -45,20 +57,28 @@ export class LeverAdapter implements AtsAdapter {
       const location = posting.categories?.location ?? "";
       if (!isUSLocation(location)) continue;
 
-      const locationType = inferLocationType(location);
+      const locationType = posting.workplaceType?.toLowerCase().includes("remote")
+        ? "Remote"
+        : inferLocationType(location);
+      const locations = posting.categories?.allLocations?.length
+        ? posting.categories.allLocations
+        : [location].filter(Boolean);
+      const postedAt = posting.createdAt
+        ? new Date(posting.createdAt).toISOString()
+        : null;
 
       jobs.push({
         externalJobId: posting.id,
         title: posting.text,
         url: posting.hostedUrl,
-        department: posting.categories?.team ?? null,
-        locations: [location].filter(Boolean),
+        department: posting.categories?.department ?? posting.categories?.team ?? null,
+        locations,
         locationType,
         salaryMin: posting.salaryRange?.min ?? null,
         salaryMax: posting.salaryRange?.max ?? null,
         salaryCurrency: posting.salaryRange?.currency ?? "USD",
         jobDescriptionHtml: posting.description ?? posting.descriptionPlain ?? "",
-        postedAt: null,
+        postedAt,
         postingEndDate: null,
       });
     }

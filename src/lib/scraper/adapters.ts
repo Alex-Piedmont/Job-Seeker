@@ -96,11 +96,19 @@ interface GreenhouseJob {
   departments: Array<{ name: string }>;
   content: string;
   metadata?: Array<{ name: string; value: unknown }>;
+  first_published?: string;
 }
 
 interface GreenhouseResponse {
   jobs: GreenhouseJob[];
   meta?: { total: number };
+}
+
+/** Extract the board slug from a Greenhouse baseUrl (e.g. "https://boards.greenhouse.io/stripe" → "stripe"). */
+function extractGreenhouseSlug(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  const segments = url.pathname.split("/").filter(Boolean);
+  return segments[segments.length - 1];
 }
 
 function extractSalary(metadata?: Array<{ name: string; value: unknown }>): { min: number | null; max: number | null } {
@@ -126,56 +134,46 @@ function extractSalary(metadata?: Array<{ name: string; value: unknown }>): { mi
 }
 
 export async function scrapeGreenhouse(company: { name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
+  const slug = extractGreenhouseSlug(company.baseUrl);
+  const url = `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`;
+
+  const response = await fetch(url, {
+    headers: { "User-Agent": USER_AGENT },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Greenhouse API returned ${response.status} for ${company.name}`);
+  }
+
+  const data = (await response.json()) as GreenhouseResponse;
+
+  if (!data.jobs || data.jobs.length === 0) {
+    return [];
+  }
+
   const jobs: ScrapedJobData[] = [];
-  let page = 1;
-  let hasMore = true;
 
-  while (hasMore) {
-    const url = `${company.baseUrl}/jobs.json?page=${page}`;
-    const response = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT },
+  for (const job of data.jobs) {
+    const locationName = job.location?.name ?? "";
+    if (!isUSLocation(locationName)) continue;
+
+    const salaryData = extractSalary(job.metadata);
+    const locationType = inferLocationType(locationName);
+
+    jobs.push({
+      externalJobId: String(job.id),
+      title: job.title,
+      url: job.absolute_url,
+      department: job.departments?.[0]?.name ?? null,
+      locations: [locationName].filter(Boolean),
+      locationType,
+      salaryMin: salaryData.min,
+      salaryMax: salaryData.max,
+      salaryCurrency: "USD",
+      jobDescriptionHtml: job.content ?? "",
+      postedAt: job.first_published ?? null,
+      postingEndDate: null,
     });
-
-    if (!response.ok) {
-      throw new Error(`Greenhouse API returned ${response.status} for ${company.name}`);
-    }
-
-    const data = (await response.json()) as GreenhouseResponse;
-
-    if (!data.jobs || data.jobs.length === 0) {
-      hasMore = false;
-      break;
-    }
-
-    for (const job of data.jobs) {
-      const locationName = job.location?.name ?? "";
-      if (!isUSLocation(locationName)) continue;
-
-      const salaryData = extractSalary(job.metadata);
-      const locationType = inferLocationType(locationName);
-
-      jobs.push({
-        externalJobId: String(job.id),
-        title: job.title,
-        url: job.absolute_url,
-        department: job.departments?.[0]?.name ?? null,
-        locations: [locationName].filter(Boolean),
-        locationType,
-        salaryMin: salaryData.min,
-        salaryMax: salaryData.max,
-        salaryCurrency: "USD",
-        jobDescriptionHtml: job.content ?? "",
-        postedAt: null,
-        postingEndDate: null,
-      });
-    }
-
-    page++;
-    if (data.jobs.length < 100) {
-      hasMore = false;
-    } else {
-      await delay(BETWEEN_REQUESTS_MS);
-    }
   }
 
   return jobs;
@@ -322,14 +320,25 @@ interface LeverPosting {
   categories: {
     location?: string;
     team?: string;
+    department?: string;
+    allLocations?: string[];
   };
   description?: string;
   descriptionPlain?: string;
+  createdAt?: number;
+  workplaceType?: string;
   salaryRange?: {
     min?: number;
     max?: number;
     currency?: string;
   };
+}
+
+/** Extract the company slug from a Lever baseUrl (e.g. "https://jobs.lever.co/spotify" → "spotify"). */
+function extractLeverSlug(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  const segments = url.pathname.split("/").filter(Boolean);
+  return segments[segments.length - 1];
 }
 
 // ---------------------------------------------------------------------------
@@ -801,7 +810,8 @@ export async function scrapeOracle(
 // ---------------------------------------------------------------------------
 
 export async function scrapeLever(company: { name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
-  const url = `${company.baseUrl}?mode=json`;
+  const slug = extractLeverSlug(company.baseUrl);
+  const url = `https://api.lever.co/v0/postings/${slug}`;
   const response = await fetch(url, {
     headers: { "User-Agent": USER_AGENT },
   });
@@ -817,18 +827,28 @@ export async function scrapeLever(company: { name: string; baseUrl: string }): P
     const location = posting.categories?.location ?? "";
     if (!isUSLocation(location)) continue;
 
+    const locationType = posting.workplaceType?.toLowerCase().includes("remote")
+      ? "Remote"
+      : inferLocationType(location);
+    const locations = posting.categories?.allLocations?.length
+      ? posting.categories.allLocations
+      : [location].filter(Boolean);
+    const postedAt = posting.createdAt
+      ? new Date(posting.createdAt).toISOString()
+      : null;
+
     jobs.push({
       externalJobId: posting.id,
       title: posting.text,
       url: posting.hostedUrl,
-      department: posting.categories?.team ?? null,
-      locations: [location].filter(Boolean),
-      locationType: inferLocationType(location),
+      department: posting.categories?.department ?? posting.categories?.team ?? null,
+      locations,
+      locationType,
       salaryMin: posting.salaryRange?.min ?? null,
       salaryMax: posting.salaryRange?.max ?? null,
       salaryCurrency: posting.salaryRange?.currency ?? "USD",
       jobDescriptionHtml: posting.description ?? posting.descriptionPlain ?? "",
-      postedAt: null,
+      postedAt,
       postingEndDate: null,
     });
   }

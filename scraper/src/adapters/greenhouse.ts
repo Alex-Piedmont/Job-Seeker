@@ -1,6 +1,5 @@
 import type { AtsAdapter, ScrapedJobData } from "./types.js";
 import { config } from "../config.js";
-import { delay } from "../utils/delay.js";
 import { isUSLocation } from "../utils/location-filter.js";
 import { logger } from "../utils/logger.js";
 
@@ -12,6 +11,15 @@ interface GreenhouseJob {
   departments: Array<{ name: string }>;
   content: string;
   metadata?: Array<{ name: string; value: unknown }>;
+  first_published?: string;
+}
+
+/** Extract the board slug from a Greenhouse baseUrl (e.g. "https://boards.greenhouse.io/stripe" → "stripe"). */
+function extractSlug(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  // Support both boards.greenhouse.io/{slug} and boards-api.greenhouse.io/v1/boards/{slug}
+  const segments = url.pathname.split("/").filter(Boolean);
+  return segments[segments.length - 1];
 }
 
 interface GreenhouseResponse {
@@ -21,58 +29,48 @@ interface GreenhouseResponse {
 
 export class GreenhouseAdapter implements AtsAdapter {
   async listJobs(company: { id: string; name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
+    const slug = extractSlug(company.baseUrl);
+    const url = `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`;
+    logger.info("Fetching Greenhouse jobs", { company: company.name, url });
+
+    const response = await fetch(url, {
+      headers: { "User-Agent": config.userAgent },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Greenhouse API returned ${response.status} for ${company.name}`);
+    }
+
+    const data = (await response.json()) as GreenhouseResponse;
+
+    if (!data.jobs || data.jobs.length === 0) {
+      logger.info("Greenhouse scrape complete", { company: company.name, jobCount: 0 });
+      return [];
+    }
+
     const jobs: ScrapedJobData[] = [];
-    let page = 1;
-    let hasMore = true;
 
-    while (hasMore) {
-      const url = `${company.baseUrl}/jobs.json?page=${page}`;
-      logger.info("Fetching Greenhouse jobs", { company: company.name, page, url });
+    for (const job of data.jobs) {
+      const locationName = job.location?.name ?? "";
+      if (!isUSLocation(locationName)) continue;
 
-      const response = await fetch(url, {
-        headers: { "User-Agent": config.userAgent },
+      const salaryData = extractSalary(job.metadata);
+      const locationType = inferLocationType(locationName);
+
+      jobs.push({
+        externalJobId: String(job.id),
+        title: job.title,
+        url: job.absolute_url,
+        department: job.departments?.[0]?.name ?? null,
+        locations: [locationName].filter(Boolean),
+        locationType,
+        salaryMin: salaryData.min,
+        salaryMax: salaryData.max,
+        salaryCurrency: "USD",
+        jobDescriptionHtml: job.content ?? "",
+        postedAt: job.first_published ?? null,
+        postingEndDate: null,
       });
-
-      if (!response.ok) {
-        throw new Error(`Greenhouse API returned ${response.status} for ${company.name}`);
-      }
-
-      const data = (await response.json()) as GreenhouseResponse;
-
-      if (!data.jobs || data.jobs.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      for (const job of data.jobs) {
-        const locationName = job.location?.name ?? "";
-        if (!isUSLocation(locationName)) continue;
-
-        const salaryData = extractSalary(job.metadata);
-        const locationType = inferLocationType(locationName);
-
-        jobs.push({
-          externalJobId: String(job.id),
-          title: job.title,
-          url: job.absolute_url,
-          department: job.departments?.[0]?.name ?? null,
-          locations: [locationName].filter(Boolean),
-          locationType,
-          salaryMin: salaryData.min,
-          salaryMax: salaryData.max,
-          salaryCurrency: "USD",
-          jobDescriptionHtml: job.content ?? "",
-          postedAt: null,
-          postingEndDate: null,
-        });
-      }
-
-      page++;
-      if (data.jobs.length < 100) {
-        hasMore = false;
-      } else {
-        await delay(config.delays.betweenRequests);
-      }
     }
 
     logger.info("Greenhouse scrape complete", { company: company.name, jobCount: jobs.length });
