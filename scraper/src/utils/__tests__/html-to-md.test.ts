@@ -51,4 +51,17 @@ describe("htmlToMarkdown", () => {
     const result = htmlToMarkdown("");
     expect(typeof result).toBe("string");
   });
+
+  it("decodes entity-encoded HTML (Greenhouse API format)", () => {
+    const encoded =
+      "&lt;h2&gt;&lt;strong&gt;Who we are&lt;/strong&gt;&lt;/h2&gt;&lt;p&gt;Description&lt;/p&gt;";
+    const result = htmlToMarkdown(encoded);
+    expect(result).toBe("## **Who we are**\n\nDescription");
+  });
+
+  it("decodes &amp; &quot; and &#39; entities", () => {
+    const encoded = "&lt;p&gt;A &amp;amp; B &amp;quot;quoted&amp;quot; it&amp;#39;s&lt;/p&gt;";
+    const result = htmlToMarkdown(encoded);
+    expect(result).toContain('A & B "quoted" it\'s');
+  });
 });
