@@ -42,7 +42,7 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
     REVIEW_SYSTEM,
     buildReviewUserMessage(resumeMarkdown, application.jobDescription),
     REVIEW_TOOL,
-    { model: "claude-haiku-4-5-20251001", maxTokens: 16384 }
+    { maxTokens: 8192 }
   );
 
   const cost = estimateCost(result.promptTokens, result.completionTokens);
