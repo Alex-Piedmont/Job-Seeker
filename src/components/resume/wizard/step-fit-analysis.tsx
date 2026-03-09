@@ -116,18 +116,18 @@ export function StepFitAnalysis({
         <h4 className="text-sm font-medium">Skills Match</h4>
         <div className="flex flex-wrap gap-1.5">
           {(skills.strong ?? []).map((s) => (
-            <Badge key={s} variant="default" className="text-xs">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
+            <Badge key={s} variant="default" className="text-xs max-w-full truncate">
+              <CheckCircle2 className="h-3 w-3 mr-1 shrink-0" />
               {s}
             </Badge>
           ))}
           {(skills.partial ?? []).map((s) => (
-            <Badge key={s} variant="secondary" className="text-xs">
+            <Badge key={s} variant="secondary" className="text-xs max-w-full truncate">
               {s}
             </Badge>
           ))}
           {(skills.missing ?? []).map((s) => (
-            <Badge key={s} variant="outline" className="text-xs text-muted-foreground">
+            <Badge key={s} variant="outline" className="text-xs max-w-full truncate text-muted-foreground">
               {s}
             </Badge>
           ))}
