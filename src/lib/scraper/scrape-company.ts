@@ -5,13 +5,14 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { scrapeGreenhouse, scrapeLever, scrapeWorkday } from "./adapters";
+import { scrapeGreenhouse, scrapeLever, scrapeWorkday, scrapeICIMS } from "./adapters";
 import type { ScrapedJobData } from "./adapters";
 import { upsertJob, upsertJobs } from "./job-store";
 
 const batchScrapers: Record<string, (company: { name: string; baseUrl: string }) => Promise<ScrapedJobData[]>> = {
   GREENHOUSE: scrapeGreenhouse,
   LEVER: scrapeLever,
+  ICIMS: scrapeICIMS,
 };
 
 export async function scrapeCompany(company: {

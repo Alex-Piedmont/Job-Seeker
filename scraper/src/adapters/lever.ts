@@ -58,6 +58,8 @@ export class LeverAdapter implements AtsAdapter {
         salaryMax: posting.salaryRange?.max ?? null,
         salaryCurrency: posting.salaryRange?.currency ?? "USD",
         jobDescriptionHtml: posting.description ?? posting.descriptionPlain ?? "",
+        postedAt: null,
+        postingEndDate: null,
       });
     }
 

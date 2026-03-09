@@ -397,6 +397,115 @@ export async function scrapeWorkday(
 }
 
 // ---------------------------------------------------------------------------
+// iCIMS / Jibe (JSON API)
+// ---------------------------------------------------------------------------
+
+interface JibeJob {
+  slug: string;
+  req_id: string;
+  title: string;
+  description: string;
+  city: string;
+  state: string;
+  country_code: string;
+  location_name: string;
+  additional_locations?: Array<{ city: string; state: string; country: string }>;
+  employment_type: string;
+  categories: Array<{ name: string }>;
+  posted_date: string;
+  posting_expiry_date: string | null;
+  apply_url: string;
+  salary_range?: string | null;
+  tags?: string;
+  tags1?: string;
+  tags2?: string;
+  tags3?: string;
+  tags4?: string;
+}
+
+interface JibeResponse {
+  jobs: Array<{ data: JibeJob }>;
+}
+
+const JIBE_HOURLY_THRESHOLD = 1000;
+
+function parseJibeSalary(salaryRange: string | null | undefined): {
+  min: number | null;
+  max: number | null;
+  isHourly: boolean;
+} {
+  if (!salaryRange) return { min: null, max: null, isHourly: false };
+  const match = salaryRange.match(/\$\s*([\d,]+(?:\.\d+)?)\s*(?:[-–—]|to)\s*\$\s*([\d,]+(?:\.\d+)?)/i);
+  if (!match) return { min: null, max: null, isHourly: false };
+  const min = parseFloat(match[1].replace(/,/g, ""));
+  const max = parseFloat(match[2].replace(/,/g, ""));
+  if (isNaN(min) || isNaN(max)) return { min: null, max: null, isHourly: false };
+  return { min, max, isHourly: max < JIBE_HOURLY_THRESHOLD };
+}
+
+export async function scrapeICIMS(company: { name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
+  const base = company.baseUrl.replace(/\/+$/, "");
+  const jobs: ScrapedJobData[] = [];
+  let page = 1;
+
+  while (true) {
+    const url = `${base}/api/jobs?page=${page}`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT },
+    });
+
+    if (!res.ok) {
+      throw new Error(`iCIMS Jibe API returned ${res.status} for ${company.name} (page ${page})`);
+    }
+
+    const data = (await res.json()) as JibeResponse;
+    if (!data.jobs || data.jobs.length === 0) break;
+
+    for (const { data: job } of data.jobs) {
+      if (job.country_code !== "US") continue;
+      if (job.employment_type && job.employment_type !== "FULL_TIME") continue;
+
+      const salary = parseJibeSalary(job.salary_range);
+      if (salary.isHourly) continue;
+
+      const locations: string[] = [];
+      if (job.location_name) locations.push(job.location_name);
+      if (job.additional_locations) {
+        for (const loc of job.additional_locations) {
+          const parts = [loc.city, loc.state, loc.country].filter(Boolean);
+          if (parts.length) locations.push(parts.join(", "));
+        }
+      }
+
+      const allText = [
+        ...locations,
+        job.tags ?? "", job.tags1 ?? "", job.tags2 ?? "", job.tags3 ?? "", job.tags4 ?? "",
+      ].join(" ");
+
+      jobs.push({
+        externalJobId: job.req_id || job.slug,
+        title: job.title,
+        url: job.apply_url,
+        department: job.categories?.[0]?.name ?? null,
+        locations,
+        locationType: inferLocationType(allText),
+        salaryMin: salary.min,
+        salaryMax: salary.max,
+        salaryCurrency: "USD",
+        jobDescriptionHtml: job.description ?? "",
+        postedAt: job.posted_date ?? null,
+        postingEndDate: job.posting_expiry_date ?? null,
+      });
+    }
+
+    page++;
+    await delay(BETWEEN_REQUESTS_MS);
+  }
+
+  return jobs;
+}
+
+// ---------------------------------------------------------------------------
 // Lever
 // ---------------------------------------------------------------------------
 

@@ -62,6 +62,8 @@ export class GreenhouseAdapter implements AtsAdapter {
           salaryMax: salaryData.max,
           salaryCurrency: "USD",
           jobDescriptionHtml: job.content ?? "",
+          postedAt: null,
+          postingEndDate: null,
         });
       }
 

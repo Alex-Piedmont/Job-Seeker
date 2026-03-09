@@ -33,8 +33,11 @@ describe("autoArchiveStaleJobs", () => {
     expect(mockPrisma.scrapedJob.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          removedAt: expect.objectContaining({ not: null }),
           archivedAt: null,
+          OR: expect.arrayContaining([
+            expect.objectContaining({ removedAt: expect.objectContaining({ not: null }) }),
+            expect.objectContaining({ postingEndDate: expect.objectContaining({ not: null }) }),
+          ]),
         }),
         data: expect.objectContaining({
           archivedAt: expect.any(Date),

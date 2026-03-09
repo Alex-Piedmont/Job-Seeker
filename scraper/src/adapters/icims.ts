@@ -1,98 +1,153 @@
 import type { AtsAdapter, ScrapedJobData } from "./types.js";
 import { config } from "../config.js";
 import { delay } from "../utils/delay.js";
-import { isUSLocation } from "../utils/location-filter.js";
 import { logger } from "../utils/logger.js";
+
+// ---------------------------------------------------------------------------
+// Jibe API types (iCIMS's modern frontend layer)
+// ---------------------------------------------------------------------------
+
+interface JibeJob {
+  slug: string;
+  req_id: string;
+  title: string;
+  description: string;
+  city: string;
+  state: string;
+  country_code: string;
+  location_name: string;
+  additional_locations?: Array<{ city: string; state: string; country: string }>;
+  employment_type: string;
+  categories: Array<{ name: string }>;
+  posted_date: string;
+  posting_expiry_date: string | null;
+  apply_url: string;
+  salary_range?: string | null;
+  tags?: string;
+  tags1?: string;
+  tags2?: string;
+  tags3?: string;
+  tags4?: string;
+}
+
+interface JibeResponse {
+  jobs: Array<{ data: JibeJob }>;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const HOURLY_RATE_THRESHOLD = 1000;
+
+/**
+ * Parse salary from Jibe `salary_range` text field.
+ * Common formats: "$203,500.00 - $305,500.00 / Annually", "$80,000 - $120,000"
+ */
+function parseSalaryRange(salaryRange: string | null | undefined): {
+  min: number | null;
+  max: number | null;
+  isHourly: boolean;
+} {
+  if (!salaryRange) return { min: null, max: null, isHourly: false };
+  const match = salaryRange.match(/\$\s*([\d,]+(?:\.\d+)?)\s*(?:[-–—]|to)\s*\$\s*([\d,]+(?:\.\d+)?)/i);
+  if (!match) return { min: null, max: null, isHourly: false };
+  const min = parseFloat(match[1].replace(/,/g, ""));
+  const max = parseFloat(match[2].replace(/,/g, ""));
+  if (isNaN(min) || isNaN(max)) return { min: null, max: null, isHourly: false };
+  const isHourly = max < HOURLY_RATE_THRESHOLD;
+  return { min, max, isHourly };
+}
+
+function inferLocationType(text: string): string | null {
+  const lower = text.toLowerCase();
+  if (lower.includes("remote")) return "Remote";
+  if (lower.includes("hybrid")) return "Hybrid";
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Adapter
+// ---------------------------------------------------------------------------
 
 export class ICIMSAdapter implements AtsAdapter {
   async listJobs(company: { id: string; name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
-    const { chromium } = await import("playwright");
-    const browser = await chromium.launch({ headless: true });
+    // baseUrl should be the Jibe-powered job site, e.g. https://jobs.statefarm.com
+    const base = company.baseUrl.replace(/\/+$/, "");
+    const jobs: ScrapedJobData[] = [];
+    let page = 1;
 
-    try {
-      const context = await browser.newContext({
-        userAgent: config.userAgent,
+    logger.info("Starting iCIMS/Jibe scrape", { company: company.name, baseUrl: base });
+
+    while (true) {
+      const url = `${base}/api/jobs?page=${page}`;
+      const res = await fetch(url, {
+        headers: { "User-Agent": config.userAgent },
       });
-      const page = await context.newPage();
-      page.setDefaultTimeout(config.playwrightTimeout);
 
-      logger.info("Navigating to iCIMS career site", { company: company.name, url: company.baseUrl });
-      await page.goto(company.baseUrl, { waitUntil: "networkidle" });
+      if (!res.ok) {
+        throw new Error(`iCIMS Jibe API returned ${res.status} for ${company.name} (page ${page})`);
+      }
 
-      const jobs: ScrapedJobData[] = [];
-      let hasMore = true;
+      const data = (await res.json()) as JibeResponse;
+      if (!data.jobs || data.jobs.length === 0) break;
 
-      while (hasMore) {
-        await page.waitForSelector('.iCIMS_JobsTable .row, .iCIMS_MainWrapper .iCIMS_InfoMsg_Job', { timeout: config.playwrightTimeout })
-          .catch(() => {
-            throw new Error(`iCIMS adapter: expected selector 'iCIMS_JobsTable' not found for ${company.name}`);
-          });
+      for (const { data: job } of data.jobs) {
+        // Filter: US only
+        if (job.country_code !== "US") continue;
 
-        const jobRows = await page.$$('.iCIMS_JobsTable .row, [class*="JobRow"], .iCIMS_MainWrapper .iCIMS_InfoMsg_Job');
+        // Filter: full-time only
+        if (job.employment_type && job.employment_type !== "FULL_TIME") continue;
 
-        for (const row of jobRows) {
-          const title = await row.$eval('a.iCIMS_Anchor, .title a, a[class*="JobTitle"]', (el) => el.textContent?.trim() ?? "").catch(() => "");
-          const linkEl = await row.$('a.iCIMS_Anchor, .title a, a[class*="JobTitle"]');
-          const href = linkEl ? await linkEl.getAttribute("href") ?? "" : "";
-          const location = await row.$eval('.iCIMS_JobHeaderData, .location, [class*="Location"]', (el) => el.textContent?.trim() ?? "").catch(() => "");
+        // Parse salary and filter hourly roles
+        const salary = parseSalaryRange(job.salary_range);
+        if (salary.isHourly) {
+          logger.info("Skipping hourly role", { company: company.name, title: job.title, salaryMax: salary.max });
+          continue;
+        }
 
-          if (!title || !href) continue;
-          if (!isUSLocation(location)) continue;
-
-          const fullUrl = href.startsWith("http") ? href : new URL(href, company.baseUrl).toString();
-          const externalJobId = href.match(/(?:job|jobs|id)[=/](\d+)/i)?.[1] ?? href;
-
-          // Navigate to detail page
-          const detailPage = await context.newPage();
-          try {
-            await detailPage.goto(fullUrl, { waitUntil: "networkidle" });
-            await delay(config.delays.betweenPages);
-
-            const descriptionHtml = await detailPage.$eval(
-              '.iCIMS_InfoMsg_Job .iCIMS_InfoMsg, .iCIMS_JobDescription, [class*="JobBody"]',
-              (el) => el.innerHTML
-            ).catch(() => "");
-
-            const department = await detailPage.$eval(
-              '.iCIMS_JobHeaderData .iCIMS_InfoMsg:first-child, [class*="Department"]',
-              (el) => el.textContent?.trim() ?? null
-            ).catch(() => null);
-
-            const locationType = location.toLowerCase().includes("remote") ? "Remote" :
-              location.toLowerCase().includes("hybrid") ? "Hybrid" : null;
-
-            jobs.push({
-              externalJobId,
-              title,
-              url: fullUrl,
-              department,
-              locations: [location].filter(Boolean),
-              locationType,
-              salaryMin: null,
-              salaryMax: null,
-              salaryCurrency: "USD",
-              jobDescriptionHtml: descriptionHtml,
-            });
-          } finally {
-            await detailPage.close();
+        // Build locations list
+        const locations: string[] = [];
+        if (job.location_name) locations.push(job.location_name);
+        if (job.additional_locations) {
+          for (const loc of job.additional_locations) {
+            const parts = [loc.city, loc.state, loc.country].filter(Boolean);
+            if (parts.length) locations.push(parts.join(", "));
           }
         }
 
-        // Try next page
-        const nextButton = await page.$('a.iCIMS_Paging_Next, [class*="PagingNext"], a[aria-label="Next"]');
-        if (nextButton) {
-          await nextButton.click();
-          await page.waitForLoadState("networkidle");
-          await delay(config.delays.betweenPages);
-        } else {
-          hasMore = false;
-        }
+        // Infer location type from all location text + tags
+        const allText = [
+          ...locations,
+          job.tags ?? "",
+          job.tags1 ?? "",
+          job.tags2 ?? "",
+          job.tags3 ?? "",
+          job.tags4 ?? "",
+        ].join(" ");
+        const locationType = inferLocationType(allText);
+
+        jobs.push({
+          externalJobId: job.req_id || job.slug,
+          title: job.title,
+          url: job.apply_url,
+          department: job.categories?.[0]?.name ?? null,
+          locations,
+          locationType,
+          salaryMin: salary.min,
+          salaryMax: salary.max,
+          salaryCurrency: "USD",
+          jobDescriptionHtml: job.description ?? "",
+          postedAt: job.posted_date ?? null,
+          postingEndDate: job.posting_expiry_date ?? null,
+        });
       }
 
-      logger.info("iCIMS scrape complete", { company: company.name, jobCount: jobs.length });
-      return jobs;
-    } finally {
-      await browser.close();
+      page++;
+      await delay(config.delays.betweenRequests);
     }
+
+    logger.info("iCIMS/Jibe scrape complete", { company: company.name, jobCount: jobs.length });
+    return jobs;
   }
 }
