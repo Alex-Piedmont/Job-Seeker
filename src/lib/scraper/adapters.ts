@@ -378,7 +378,8 @@ interface CxsDetailResponse {
 
 function parseWorkdayUrl(baseUrl: string): { host: string; tenant: string; siteId: string } {
   const url = new URL(baseUrl);
-  const segments = url.pathname.split("/").filter(Boolean);
+  // Strip locale prefixes like /en-US/ before extracting siteId
+  const segments = url.pathname.split("/").filter(Boolean).filter((s) => !/^[a-z]{2}(-[A-Z]{2})?$/.test(s));
   if (segments.length < 1) {
     throw new Error(`Cannot parse Workday URL – expected /<siteId> path: ${baseUrl}`);
   }
