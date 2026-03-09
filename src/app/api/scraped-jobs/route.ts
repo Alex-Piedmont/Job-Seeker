@@ -29,7 +29,7 @@ export const GET = authenticatedHandler(async (request, { userId }) => {
   }
   if (location) {
     const matchingIds = await prisma.$queryRawUnsafe<{ id: string }[]>(
-      `SELECT id FROM "ScrapedJob" WHERE EXISTS (
+      `SELECT id FROM scraped_jobs WHERE EXISTS (
         SELECT 1 FROM jsonb_array_elements_text(locations) AS loc
         WHERE loc ILIKE $1
       )`,
