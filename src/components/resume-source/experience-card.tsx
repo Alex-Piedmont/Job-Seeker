@@ -49,6 +49,7 @@ export function ExperienceCard({
   const [fields, setFields] = useState({
     ...entry,
     alternateTitles: entry.alternateTitles ?? [],
+    subsections: entry.subsections ?? [],
   });
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [altTitleInput, setAltTitleInput] = useState("");
