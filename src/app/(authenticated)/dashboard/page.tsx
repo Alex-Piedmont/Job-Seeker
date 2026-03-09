@@ -121,7 +121,7 @@ export default function DashboardPage() {
                 <span>
                   We&apos;re now importing job listings from <strong className="text-foreground">70+ companies</strong> with
                   more being added consistently. Ongoing QA is in progress as we verify each
-                  source. Over <strong className="text-foreground">6,800+ roles</strong> are currently listed and growing.
+                  source. Over <strong className="text-foreground">6,800+ roles</strong> are currently listed and growing. Please note that Accenture roles are showing the date pulled instead of the posting date. This will be fixed soon. 
                 </span>
               </li>
             </ul>
