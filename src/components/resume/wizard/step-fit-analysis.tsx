@@ -87,11 +87,11 @@ export function StepFitAnalysis({
 
   if (!analysis) return null;
 
-  const roles = analysis.relevantRoles ?? [];
+  const roles = Array.isArray(analysis.relevantRoles) ? analysis.relevantRoles : [];
   const skills = analysis.skillsMatch ?? { strong: [], partial: [], missing: [] };
-  const wins = analysis.alignedWins ?? [];
-  const gaps = analysis.gaps ?? [];
-  const titles = analysis.titleRecommendations ?? [];
+  const wins = Array.isArray(analysis.alignedWins) ? analysis.alignedWins : [];
+  const gaps = Array.isArray(analysis.gaps) ? analysis.gaps : [];
+  const titles = Array.isArray(analysis.titleRecommendations) ? analysis.titleRecommendations : [];
 
   return (
     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
