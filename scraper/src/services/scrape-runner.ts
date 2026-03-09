@@ -43,12 +43,19 @@ export async function scrapeCompany(company: {
     });
   }
 
-  await prisma.company.update({
-    where: { id: company.id },
-    data: {
-      lastScrapeAt: new Date(),
-      scrapeStatus: status,
-      scrapeError: status === "SUCCESS" ? null : error,
-    },
-  });
+  try {
+    await prisma.company.update({
+      where: { id: company.id },
+      data: {
+        lastScrapeAt: new Date(),
+        scrapeStatus: status,
+        scrapeError: status === "SUCCESS" ? null : error,
+      },
+    });
+  } catch (dbErr) {
+    logger.error("Failed to update company scrape status", {
+      company: company.name,
+      error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+    });
+  }
 }
