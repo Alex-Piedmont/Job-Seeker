@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticatedHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@/generated/prisma/client";
 import { scrapedJobQuerySchema } from "@/lib/validations/scraper";
 
 export const GET = authenticatedHandler(async (request, { userId }) => {
@@ -29,11 +28,12 @@ export const GET = authenticatedHandler(async (request, { userId }) => {
     where.company = { name: { equals: company, mode: "insensitive" } };
   }
   if (location) {
-    const matchingIds = await prisma.$queryRaw<{ id: string }[]>(
-      Prisma.sql`SELECT id FROM "ScrapedJob" WHERE EXISTS (
+    const matchingIds = await prisma.$queryRawUnsafe<{ id: string }[]>(
+      `SELECT id FROM "ScrapedJob" WHERE EXISTS (
         SELECT 1 FROM jsonb_array_elements_text(locations) AS loc
-        WHERE loc ILIKE ${'%' + location + '%'}
-      )`
+        WHERE loc ILIKE $1
+      )`,
+      `%${location}%`
     );
     where.id = { in: matchingIds.map((r) => r.id) };
   }

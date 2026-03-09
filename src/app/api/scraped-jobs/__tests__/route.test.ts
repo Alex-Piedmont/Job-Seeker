@@ -7,16 +7,13 @@ const { mockAuth, mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn(),
       count: vi.fn(),
     },
-    $queryRaw: vi.fn(),
+    $queryRawUnsafe: vi.fn(),
   };
   return { mockAuth, mockPrisma };
 });
 
 vi.mock("@/lib/auth", () => ({ auth: () => mockAuth() }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
-vi.mock("@/generated/prisma/client", () => ({
-  Prisma: { sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }) },
-}));
 
 import { GET } from "../route";
 
@@ -132,13 +129,13 @@ describe("GET /api/scraped-jobs", () => {
 
   it("applies location filter via raw query and passes matching IDs", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user1" } });
-    mockPrisma.$queryRaw.mockResolvedValue([{ id: "job1" }, { id: "job2" }]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ id: "job1" }, { id: "job2" }]);
     mockPrisma.scrapedJob.findMany.mockResolvedValue([sampleJob]);
     mockPrisma.scrapedJob.count.mockResolvedValue(1);
 
     await callGet("?location=Atlanta");
 
-    expect(mockPrisma.$queryRaw).toHaveBeenCalled();
+    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalled();
     const findManyCall = mockPrisma.scrapedJob.findMany.mock.calls[0][0];
     expect(findManyCall.where.id).toEqual({ in: ["job1", "job2"] });
   });
