@@ -18,7 +18,11 @@ export function buildResumePrompt(
   jobDescription: string,
   context?: ResumePromptContext
 ): { system: string; user: string } {
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
   const system = `You are an expert resume writer who creates highly targeted, ATS-optimized resumes.
+
+Today's date is ${today}. Use this to determine whether degrees, certifications, or roles are completed or in-progress. If an end date is in the past, treat it as completed — do NOT use "Expected" or "Anticipated" language.
 
 Your task is to tailor the candidate's resume for a specific job posting. Follow these rules:
 

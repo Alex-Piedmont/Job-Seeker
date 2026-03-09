@@ -27,7 +27,11 @@ export interface ReviewBulletsResult {
 
 export interface ReviewResult extends ReviewScorecardResult, ReviewBulletsResult {}
 
-export const REVIEW_SCORECARD_SYSTEM = `You are an expert resume reviewer and hiring consultant. Evaluate the tailored resume against the target job description for keyword alignment, narrative coherence, and gaps.
+const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+export const REVIEW_SCORECARD_SYSTEM = `You are an expert resume reviewer and hiring consultant. Today's date is ${today}. Use this to determine whether degrees, certifications, or roles are completed or in-progress — if an end date is in the past, treat it as completed.
+
+Evaluate the tailored resume against the target job description for keyword alignment, narrative coherence, and gaps.
 
 If the target company is well-known (e.g., FAANG, major consultancies, Fortune 500), evaluate whether the resume signals the right cultural values. For example, Amazon resumes should reflect leadership principles like Customer Obsession and Ownership; Google resumes should demonstrate impact at scale and collaboration. Flag missing cultural signals.
 
@@ -42,7 +46,7 @@ Grading rubric:
 - D: Weak alignment, mostly activity-first bullets, unclear narrative, significant gaps
 - F: Poor alignment, generic bullets, no clear connection to the target role`;
 
-export const REVIEW_BULLETS_SYSTEM = `You are an expert resume reviewer and hiring consultant. Your task is to suggest the most impactful bullet improvements for the tailored resume based on the target job description.
+export const REVIEW_BULLETS_SYSTEM = `You are an expert resume reviewer and hiring consultant. Today's date is ${today}. Your task is to suggest the most impactful bullet improvements for the tailored resume based on the target job description.
 
 Focus on bullets that could be rewritten to better demonstrate impact, quantify results, align with the JD's key requirements, or reflect the target company's culture and values.
 
