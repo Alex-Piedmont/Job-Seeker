@@ -92,8 +92,10 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
     );
   }
 
-  const resumeHash = hashContent(resumeMarkdown);
-  const jdHash = hashContent(application.jobDescription);
+  // Version prefix invalidates cache when analysis format changes
+  const CACHE_VERSION = "v2:";
+  const resumeHash = hashContent(CACHE_VERSION + resumeMarkdown);
+  const jdHash = hashContent(CACHE_VERSION + application.jobDescription);
 
   // Check cache
   const cached = await prisma.fitAnalysisCache.findUnique({
