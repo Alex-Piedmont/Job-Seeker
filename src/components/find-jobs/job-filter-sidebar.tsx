@@ -12,6 +12,8 @@ import { useState } from "react";
 
 export interface FilterValues {
   q: string;
+  titleLevels: string[];
+  customLevel: string;
   companyIds: string[];
   location: string;
   salaryMin: string;
@@ -20,6 +22,8 @@ export interface FilterValues {
   postedTo: string;
   showArchived: boolean;
 }
+
+const PRESET_LEVELS = ["Vice President", "Director", "Manager"] as const;
 
 interface Company {
   id: string;
@@ -36,6 +40,8 @@ interface JobFilterSidebarProps {
 
 export const emptyFilters: FilterValues = {
   q: "",
+  titleLevels: [],
+  customLevel: "",
   companyIds: [],
   location: "",
   salaryMin: "",
@@ -58,8 +64,16 @@ export function JobFilterSidebar({ filters, companies, onFilterChange, onClearAl
     update({ companyIds: next });
   };
 
+  const toggleLevel = (level: string) => {
+    const current = filters.titleLevels;
+    const next = current.includes(level) ? current.filter((l) => l !== level) : [...current, level];
+    update({ titleLevels: next });
+  };
+
   const hasFilters =
     filters.q ||
+    filters.titleLevels.length > 0 ||
+    filters.customLevel ||
     filters.companyIds.length > 0 ||
     filters.location ||
     filters.salaryMin ||
@@ -86,6 +100,57 @@ export function JobFilterSidebar({ filters, companies, onFilterChange, onClearAl
           placeholder="e.g. Software Engineer"
           value={filters.q}
           onChange={(e) => update({ q: e.target.value })}
+          className="h-8 text-sm"
+        />
+      </div>
+
+      {/* Title level filter */}
+      <div className="space-y-1.5">
+        <Label className="text-xs">Title Level</Label>
+        <div className="flex flex-wrap gap-1.5">
+          {PRESET_LEVELS.map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => toggleLevel(level)}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer",
+                filters.titleLevels.includes(level)
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-input hover:bg-accent"
+              )}
+            >
+              {level}
+            </button>
+          ))}
+          {filters.customLevel && (
+            <button
+              type="button"
+              onClick={() => toggleLevel(filters.customLevel)}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors cursor-pointer",
+                filters.titleLevels.includes(filters.customLevel)
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-input hover:bg-accent"
+              )}
+            >
+              {filters.customLevel}
+            </button>
+          )}
+        </div>
+        <Input
+          placeholder="Custom: e.g. Analyst, Specialist"
+          value={filters.customLevel}
+          onChange={(e) => {
+            const prev = filters.customLevel;
+            const next = e.target.value;
+            // If old custom level was selected, remove it and add new one if non-empty
+            const levels = filters.titleLevels.filter((l) => l !== prev);
+            if (next && filters.titleLevels.includes(prev)) {
+              levels.push(next);
+            }
+            update({ customLevel: next, titleLevels: levels });
+          }}
           className="h-8 text-sm"
         />
       </div>

@@ -45,6 +45,8 @@ interface PaginationData {
 function filtersFromParams(params: URLSearchParams): FilterValues {
   return {
     q: params.get("q") ?? "",
+    titleLevels: params.get("titleLevels")?.split(",").filter(Boolean) ?? [],
+    customLevel: params.get("customLevel") ?? "",
     companyIds: params.get("companyIds")?.split(",").filter(Boolean) ?? [],
     location: params.get("location") ?? "",
     salaryMin: params.get("salaryMin") ?? "",
@@ -64,6 +66,8 @@ function sortFromParams(params: URLSearchParams): SortOption {
 function filtersToParams(filters: FilterValues, sort: SortOption, page: number): URLSearchParams {
   const p = new URLSearchParams();
   if (filters.q) p.set("q", filters.q);
+  if (filters.titleLevels.length) p.set("titleLevels", filters.titleLevels.join(","));
+  if (filters.customLevel) p.set("customLevel", filters.customLevel);
   if (filters.companyIds.length) p.set("companyIds", filters.companyIds.join(","));
   if (filters.location) p.set("location", filters.location);
   if (filters.salaryMin) p.set("salaryMin", filters.salaryMin);
@@ -80,6 +84,7 @@ function buildApiUrl(filters: FilterValues, sort: SortOption, page: number): str
   const { sort: apiSort, order } = sortToApiParams(sort);
   const p = new URLSearchParams();
   if (filters.q) p.set("q", filters.q);
+  if (filters.titleLevels.length) p.set("titleLevels", filters.titleLevels.join(","));
   if (filters.companyIds.length) p.set("companyIds", filters.companyIds.join(","));
   if (filters.location) p.set("location", filters.location);
   if (filters.salaryMin) p.set("salaryMin", filters.salaryMin);

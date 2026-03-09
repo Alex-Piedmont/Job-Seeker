@@ -13,7 +13,7 @@ export const GET = authenticatedHandler(async (request, { userId }) => {
       { status: 400 }
     );
   }
-  const { q, company, companyId, companyIds, location, locationType, salaryMin, salaryMax, postedFrom, postedTo, includeRemoved, includeArchived, page, limit, sort, order } = parsed.data;
+  const { q, titleLevels, company, companyId, companyIds, location, locationType, salaryMin, salaryMax, postedFrom, postedTo, includeRemoved, includeArchived, page, limit, sort, order } = parsed.data;
 
   const where: Record<string, unknown> = {};
 
@@ -27,6 +27,17 @@ export const GET = authenticatedHandler(async (request, { userId }) => {
   } else if (company) {
     where.company = { name: { equals: company, mode: "insensitive" } };
   }
+
+  // Helper to intersect ID sets from raw SQL filters
+  const intersectIds = (ids: string[]) => {
+    if (where.id && typeof where.id === "object" && "in" in (where.id as Record<string, unknown>)) {
+      const existing = new Set((where.id as { in: string[] }).in);
+      where.id = { in: ids.filter((id) => existing.has(id)) };
+    } else {
+      where.id = { in: ids };
+    }
+  };
+
   if (location) {
     const matchingIds = await prisma.$queryRawUnsafe<{ id: string }[]>(
       `SELECT id FROM scraped_jobs WHERE EXISTS (
@@ -35,7 +46,18 @@ export const GET = authenticatedHandler(async (request, { userId }) => {
       )`,
       `%${location}%`
     );
-    where.id = { in: matchingIds.map((r) => r.id) };
+    intersectIds(matchingIds.map((r) => r.id));
+  }
+  if (titleLevels) {
+    const levels = titleLevels.split(",").filter(Boolean);
+    if (levels.length > 0) {
+      // Match any selected level in the title (case-insensitive, OR between levels)
+      const levelMatchIds = await prisma.$queryRawUnsafe<{ id: string }[]>(
+        `SELECT id FROM scraped_jobs WHERE ${levels.map((_, i) => `title ILIKE $${i + 1}`).join(" OR ")}`,
+        ...levels.map((l) => `%${l}%`)
+      );
+      intersectIds(levelMatchIds.map((r) => r.id));
+    }
   }
   if (locationType) {
     where.locationType = locationType;

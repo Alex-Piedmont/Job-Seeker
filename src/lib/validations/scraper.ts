@@ -26,6 +26,7 @@ export const updateCompanySchema = z.object({
 
 export const scrapedJobQuerySchema = z.object({
   q: z.string().optional(),
+  titleLevels: z.string().optional(), // comma-separated title levels e.g. "Director,Manager"
   company: z.string().optional(),
   companyId: z.string().optional(),
   companyIds: z.string().optional(), // comma-separated company IDs
