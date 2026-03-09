@@ -47,7 +47,7 @@ export function ResumeWizard({
 
   const handleFitAnalysisComplete = useCallback((analysis: FitAnalysisResult) => {
     setFitAnalysis(analysis);
-    if ((analysis.questions ?? []).length > 0) {
+    if (Array.isArray(analysis.questions) && analysis.questions.length > 0) {
       setStep(2);
     } else {
       setStep(3);
@@ -103,7 +103,7 @@ export function ResumeWizard({
 
         {step === 2 && fitAnalysis && (
           <StepQuestions
-            questions={fitAnalysis.questions}
+            questions={Array.isArray(fitAnalysis.questions) ? fitAnalysis.questions : []}
             onComplete={handleQuestionsComplete}
           />
         )}
