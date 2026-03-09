@@ -246,7 +246,7 @@ export function JobDetailModal({ jobId, onClose, onToggleArchive, importedJobIds
 
   return (
     <Dialog open={!!jobId} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden p-0">
+      <DialogContent className="!max-w-4xl max-h-[90vh] overflow-hidden p-0">
         <DialogHeader className="p-6 pb-2">
           <DialogTitle>{job?.title ?? "Loading..."}</DialogTitle>
         </DialogHeader>
