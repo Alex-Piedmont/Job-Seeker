@@ -129,7 +129,7 @@ export function JobFilterSidebar({ filters, companies, onFilterChange, onClearAl
                 <Badge key={id} variant="secondary" className="text-xs gap-1">
                   {c.name}
                   <X
-                    className="h-3 w-3 cursor-pointer"
+                    className="h-3 w-3 cursor-pointer !pointer-events-auto"
                     onClick={() => toggleCompany(id)}
                   />
                 </Badge>
