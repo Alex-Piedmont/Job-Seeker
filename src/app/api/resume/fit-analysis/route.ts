@@ -13,6 +13,24 @@ import {
   type FitAnalysisResult,
 } from "@/lib/resume-prompts/fit-analysis";
 
+/** Normalize AI output so every field is the expected type. */
+function normalizeFitAnalysis(raw: Record<string, unknown>): FitAnalysisResult {
+  return {
+    relevantRoles: Array.isArray(raw.relevantRoles) ? raw.relevantRoles : [],
+    alignedWins: Array.isArray(raw.alignedWins) ? raw.alignedWins : [],
+    skillsMatch: raw.skillsMatch && typeof raw.skillsMatch === "object" && !Array.isArray(raw.skillsMatch)
+      ? {
+          strong: Array.isArray((raw.skillsMatch as Record<string, unknown>).strong) ? (raw.skillsMatch as { strong: string[] }).strong : [],
+          partial: Array.isArray((raw.skillsMatch as Record<string, unknown>).partial) ? (raw.skillsMatch as { partial: string[] }).partial : [],
+          missing: Array.isArray((raw.skillsMatch as Record<string, unknown>).missing) ? (raw.skillsMatch as { missing: string[] }).missing : [],
+        }
+      : { strong: [], partial: [], missing: [] },
+    gaps: Array.isArray(raw.gaps) ? raw.gaps : [],
+    titleRecommendations: Array.isArray(raw.titleRecommendations) ? raw.titleRecommendations : [],
+    questions: Array.isArray(raw.questions) ? raw.questions : [],
+  };
+}
+
 export const maxDuration = 60;
 
 export const POST = authenticatedHandler(async (request, { userId }) => {
@@ -88,7 +106,7 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
     cached.jobDescriptionHash === jdHash
   ) {
     return NextResponse.json({
-      analysis: JSON.parse(cached.analysisJson),
+      analysis: normalizeFitAnalysis(JSON.parse(cached.analysisJson)),
       cached: true,
     });
   }
@@ -101,9 +119,10 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
     { model: "claude-haiku-4-5-20251001" }
   );
 
+  const analysis = normalizeFitAnalysis(result.data as unknown as Record<string, unknown>);
   const cost = estimateCost(result.promptTokens, result.completionTokens);
 
-  // Upsert cache
+  // Upsert cache (store normalized data)
   await prisma.fitAnalysisCache.upsert({
     where: { jobApplicationId },
     create: {
@@ -111,12 +130,12 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
       jobApplicationId,
       resumeSourceHash: resumeHash,
       jobDescriptionHash: jdHash,
-      analysisJson: JSON.stringify(result.data),
+      analysisJson: JSON.stringify(analysis),
     },
     update: {
       resumeSourceHash: resumeHash,
       jobDescriptionHash: jdHash,
-      analysisJson: JSON.stringify(result.data),
+      analysisJson: JSON.stringify(analysis),
     },
   });
 
@@ -135,7 +154,7 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
   });
 
   return NextResponse.json({
-    analysis: result.data,
+    analysis,
     cached: false,
     promptTokens: result.promptTokens,
     completionTokens: result.completionTokens,
