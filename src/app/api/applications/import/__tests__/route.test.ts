@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextResponse } from "next/server";
 
 const { mockAuth, mockScrapedJob, mockJobApplication, mockUser, mockKanbanColumn, mockStatusLog } = vi.hoisted(() => {
   return {
@@ -55,13 +54,16 @@ vi.mock("@/lib/prisma", () => ({
 
 import { POST } from "../route";
 
+const defaultParams = { params: Promise.resolve({}) };
+
 function callImport(body: unknown) {
   return POST(
     new Request("http://localhost/api/applications/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    })
+    }),
+    defaultParams
   );
 }
 

@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { authenticatedHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/prisma";
 import { validateBody } from "@/lib/validations";
 import { reorderColumnsSchema } from "@/lib/validations/kanban";
 
-export async function PUT(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const userId = session.user.id;
-
+export const PUT = authenticatedHandler(async (request, { userId }) => {
   const validation = await validateBody(request, reorderColumnsSchema);
   if (!validation.success) return validation.response;
   const { ids } = validation.data;
@@ -41,4 +35,4 @@ export async function PUT(request: Request) {
   );
 
   return NextResponse.json({ success: true });
-}
+});

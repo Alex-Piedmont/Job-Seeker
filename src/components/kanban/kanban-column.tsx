@@ -3,15 +3,10 @@
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { ColumnHeader } from "./column-header";
-import { ApplicationCard, type ApplicationCardData } from "./application-card";
+import { ApplicationCard } from "./application-card";
+import type { ColumnData, ApplicationCardData, DragHandleProps } from "@/types/kanban";
 
-export interface ColumnData {
-  id: string;
-  name: string;
-  color: string;
-  columnType: string | null;
-  applications: ApplicationCardData[];
-}
+export type { ColumnData };
 
 interface KanbanColumnProps {
   column: ColumnData;
@@ -19,8 +14,7 @@ interface KanbanColumnProps {
   onSettingsClick: (columnId: string) => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  columnDragHandleProps?: any;
+  columnDragHandleProps?: DragHandleProps;
   droppableProvided?: {
     setNodeRef: (element: HTMLElement | null) => void;
   };
@@ -42,7 +36,8 @@ export function KanbanColumn({
       <div
         className="flex flex-col items-center bg-muted/40 rounded-xl border border-border/50 shadow-sm w-12 max-h-full cursor-pointer snap-start shrink-0 py-3 gap-2 hover:bg-muted/60 transition-colors"
         onClick={onToggleCollapse}
-        {...columnDragHandleProps}
+        {...columnDragHandleProps?.listeners}
+        {...columnDragHandleProps?.attributes}
       >
         <div
           className="h-3 w-3 rounded-full shrink-0"

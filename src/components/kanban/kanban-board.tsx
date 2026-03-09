@@ -28,8 +28,9 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { KanbanColumn, type ColumnData } from "./kanban-column";
-import { ApplicationCard, type ApplicationCardData } from "./application-card";
+import { KanbanColumn } from "./kanban-column";
+import { ApplicationCard } from "./application-card";
+import type { ColumnData, ApplicationCardData, DragHandleProps } from "@/types/kanban";
 import { SearchFilterBar } from "./search-filter-bar";
 import { CreateApplicationModal } from "./create-application-modal";
 import { ApplicationDetailDrawer } from "./application-detail-drawer";
@@ -54,13 +55,7 @@ function SortableColumn({
   id: string;
   children: (props: {
     setNodeRef: (node: HTMLElement | null) => void;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    style: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    listeners: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    attributes: any;
-  }) => React.ReactNode;
+  } & DragHandleProps) => React.ReactNode;
 }) {
   const { setNodeRef, transform, transition, listeners, attributes } =
     useSortable({ id });
@@ -80,14 +75,8 @@ function SortableCard({
   id: string;
   children: (props: {
     setNodeRef: (node: HTMLElement | null) => void;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    style: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    listeners: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    attributes: any;
     isDragging: boolean;
-  }) => React.ReactNode;
+  } & DragHandleProps) => React.ReactNode;
 }) {
   const {
     setNodeRef,
@@ -450,7 +439,7 @@ export function KanbanBoard() {
           "kanban-collapsed-columns",
           JSON.stringify([...next])
         );
-      } catch {}
+      } catch { /* localStorage may be unavailable — non-critical */ }
       return next;
     });
   };
@@ -562,7 +551,7 @@ export function KanbanBoard() {
                         onToggleCollapse={() =>
                           handleToggleCollapse(column.id)
                         }
-                        columnDragHandleProps={{ ...listeners, ...attributes }}
+                        columnDragHandleProps={{ style, listeners, attributes }}
                         droppableProvided={{ setNodeRef: () => {} }}
                         renderCard={(app, _index) => (
                           <SortableCard key={app.id} id={app.id}>
@@ -579,8 +568,9 @@ export function KanbanBoard() {
                                   columnType={column.columnType}
                                   onClick={() => setSelectedAppId(app.id)}
                                   dragHandleProps={{
-                                    ...cardListeners,
-                                    ...cardAttributes,
+                                    style: cardStyle,
+                                    listeners: cardListeners,
+                                    attributes: cardAttributes,
                                   }}
                                 />
                               </div>

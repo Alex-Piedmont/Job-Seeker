@@ -10,36 +10,16 @@ import {
   type StaleCheckInput,
 } from "@/lib/kanban-utils";
 import { GRADE_COLORS } from "@/lib/resume-prompts/review";
+import type { ApplicationCardData, DragHandleProps } from "@/types/kanban";
 
-export interface ApplicationCardData {
-  id: string;
-  serialNumber: number;
-  company: string;
-  role: string;
-  hiringManager: string | null;
-  referrals: string | null;
-  locationType: string | null;
-  primaryLocation: string | null;
-  salaryMin: number | null;
-  salaryMax: number | null;
-  bonusTargetPct: number | null;
-  variableComp: number | null;
-  updatedAt: string;
-  _count: { interviews: number; notes: number };
-  statusLogs: { movedAt: string }[];
-  notes: { createdAt: string }[];
-  interviews: { createdAt: string }[];
-  resumeGenerations?: { reviewJson: string | null }[];
-  scrapedJob?: { removedAt: string | null } | null;
-}
+export type { ApplicationCardData };
 
 interface ApplicationCardProps {
   application: ApplicationCardData;
   columnColor: string;
   columnType: string | null;
   onClick: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dragHandleProps?: any;
+  dragHandleProps?: DragHandleProps;
 }
 
 export function ApplicationCard({
@@ -80,7 +60,8 @@ export function ApplicationCard({
       )}
       style={{ borderLeftWidth: 3, borderLeftColor: columnColor }}
       onClick={onClick}
-      {...dragHandleProps}
+      {...dragHandleProps?.listeners}
+      {...dragHandleProps?.attributes}
     >
       <div className="flex items-start gap-2">
         <div

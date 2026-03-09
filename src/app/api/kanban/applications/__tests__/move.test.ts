@@ -34,6 +34,8 @@ vi.mock("@/lib/prisma", () => ({
 
 import { PUT } from "../../applications/move/route";
 
+const defaultParams = { params: Promise.resolve({}) };
+
 function makeRequest(body: unknown): Request {
   return new Request("http://localhost/api/kanban/applications/move", {
     method: "PUT",
@@ -52,7 +54,7 @@ describe("PUT /api/kanban/applications/move", () => {
 
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValue(null);
-    const res = await PUT(makeRequest({ id: "app1", columnId: "col2", newOrder: 0 }));
+    const res = await PUT(makeRequest({ id: "app1", columnId: "col2", newOrder: 0 }), defaultParams);
     expect(res.status).toBe(401);
   });
 
@@ -80,7 +82,8 @@ describe("PUT /api/kanban/applications/move", () => {
     });
 
     const res = await PUT(
-      makeRequest({ id: "app1", columnId: "col2", newOrder: 0 })
+      makeRequest({ id: "app1", columnId: "col2", newOrder: 0 }),
+      defaultParams
     );
     expect(res.status).toBe(200);
     expect(mockTx.applicationStatusLog.create).toHaveBeenCalledOnce();
@@ -108,7 +111,7 @@ describe("PUT /api/kanban/applications/move", () => {
       columnId: "col2",
     });
 
-    await PUT(makeRequest({ id: "app1", columnId: "col2", newOrder: 0 }));
+    await PUT(makeRequest({ id: "app1", columnId: "col2", newOrder: 0 }), defaultParams);
 
     const updateCall = mockTx.jobApplication.update.mock.calls[0][0];
     expect(updateCall.data.dateApplied).toBeInstanceOf(Date);
@@ -143,7 +146,8 @@ describe("PUT /api/kanban/applications/move", () => {
         newOrder: 0,
         rejectionDate: "2026-03-01",
         closedReason: "ghosted",
-      })
+      }),
+      defaultParams
     );
 
     const updateCall = mockTx.jobApplication.update.mock.calls[0][0];
@@ -156,7 +160,8 @@ describe("PUT /api/kanban/applications/move", () => {
     mockPrisma.jobApplication.findFirst.mockResolvedValue(null);
 
     const res = await PUT(
-      makeRequest({ id: "fake", columnId: "col2", newOrder: 0 })
+      makeRequest({ id: "fake", columnId: "col2", newOrder: 0 }),
+      defaultParams
     );
     expect(res.status).toBe(404);
   });

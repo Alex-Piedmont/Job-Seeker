@@ -1,17 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { authenticatedHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/prisma";
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string; noteId: string }> }
-) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const userId = session.user.id;
-  const { id, noteId } = await params;
+export const DELETE = authenticatedHandler(async (_request, { userId, params }) => {
+  const { id, noteId } = params;
 
   const application = await prisma.jobApplication.findFirst({
     where: { id, userId },
@@ -29,4 +21,4 @@ export async function DELETE(
 
   await prisma.applicationNote.delete({ where: { id: noteId } });
   return new NextResponse(null, { status: 204 });
-}
+});

@@ -1,3 +1,7 @@
+import { NextResponse } from "next/server";
+import { authenticatedHandler } from "@/lib/api-handler";
+import { validateBody } from "@/lib/validations";
+import { reorderSchema } from "@/lib/validations/resume-source";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -107,4 +111,34 @@ export async function reorderEntries(
       })
     )
   );
+}
+
+type ReorderModel = Parameters<typeof reorderEntries>[0];
+
+/**
+ * Factory for reorder route handlers. Each reorder route validates IDs,
+ * verifies ownership, appends missing IDs, and calls reorderEntries.
+ */
+export function createReorderHandler(
+  model: ReorderModel,
+  findMany: (resumeSourceId: string) => Promise<{ id: string }[]>
+) {
+  return authenticatedHandler(async (request, { userId }) => {
+    const validation = await validateBody(request, reorderSchema);
+    if (!validation.success) return validation.response;
+
+    const resumeSourceId = await getResumeSourceId(userId);
+
+    const entries = await findMany(resumeSourceId);
+    const validIds = new Set(entries.map((e) => e.id));
+    const requestedIds = validation.data.ids.filter((id) => validIds.has(id));
+    const missingIds = entries
+      .map((e) => e.id)
+      .filter((id) => !requestedIds.includes(id));
+    const finalIds = [...requestedIds, ...missingIds];
+
+    await reorderEntries(model, finalIds);
+
+    return NextResponse.json({ success: true });
+  });
 }

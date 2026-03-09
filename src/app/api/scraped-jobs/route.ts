@@ -1,15 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { authenticatedHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/prisma";
 import { scrapedJobQuerySchema } from "@/lib/validations/scraper";
 
-export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-  const userId = session.user.id;
-
+export const GET = authenticatedHandler(async (request, { userId }) => {
   const url = new URL(request.url);
   const rawParams = Object.fromEntries(url.searchParams.entries());
   const parsed = scrapedJobQuerySchema.safeParse(rawParams);
@@ -94,8 +88,8 @@ export async function GET(request: Request) {
     isArchived: userArchives.length > 0,
   }));
 
-  return Response.json({
+  return NextResponse.json({
     jobs: formattedJobs,
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
-}
+});

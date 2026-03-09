@@ -1,17 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { authenticatedHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/prisma";
 
-export async function POST(
-  _request: Request,
-  { params }: { params: Promise<Record<string, string>> }
-) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-  const userId = session.user.id;
-  const { id } = await params;
+export const POST = authenticatedHandler(async (_request, { userId, params }) => {
+  const { id } = params;
 
   // Verify the scraped job exists
   const job = await prisma.scrapedJob.findUnique({ where: { id } });
@@ -30,19 +22,11 @@ export async function POST(
   const archive = await prisma.userJobArchive.create({
     data: { userId, scrapedJobId: id },
   });
-  return Response.json(archive, { status: 201 });
-}
+  return NextResponse.json(archive, { status: 201 });
+});
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<Record<string, string>> }
-) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-  const userId = session.user.id;
-  const { id } = await params;
+export const DELETE = authenticatedHandler(async (_request, { userId, params }) => {
+  const { id } = params;
 
   const existing = await prisma.userJobArchive.findUnique({
     where: { userId_scrapedJobId: { userId, scrapedJobId: id } },
@@ -54,5 +38,5 @@ export async function DELETE(
   await prisma.userJobArchive.delete({
     where: { userId_scrapedJobId: { userId, scrapedJobId: id } },
   });
-  return new Response(null, { status: 204 });
-}
+  return new NextResponse(null, { status: 204 });
+});

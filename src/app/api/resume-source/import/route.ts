@@ -12,15 +12,6 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
 
   const parsed = parseResumeMarkdown(validation.data.markdown);
 
-  console.log("[import] parsed:", {
-    contact: parsed.contact.fullName,
-    education: parsed.education.length,
-    experiences: parsed.experiences.length,
-    skills: parsed.skills.length,
-    publications: parsed.publications.length,
-    customSections: parsed.customSections.length,
-  });
-
   let step = "init";
   const resumeSource = await prisma.$transaction(async (tx) => {
     step = "upsert";

@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { adminHandler } from "@/lib/admin";
 import { prisma } from "@/lib/prisma";
+import { scrapeCompany } from "@/lib/scraper/scrape-company";
 import { validateBody } from "@/lib/validations";
 import { createCompanySchema } from "@/lib/validations/scraper";
 
@@ -49,5 +50,15 @@ export const POST = adminHandler(async (request) => {
   }
 
   const company = await prisma.company.create({ data });
+
+  after(async () => {
+    await scrapeCompany({
+      id: company.id,
+      name: company.name,
+      baseUrl: company.baseUrl,
+      atsPlatform: company.atsPlatform,
+    });
+  });
+
   return Response.json(company, { status: 201 });
 });

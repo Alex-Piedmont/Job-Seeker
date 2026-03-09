@@ -32,6 +32,8 @@ vi.mock("@/lib/prisma", () => ({
 
 import { GET, POST } from "../route";
 
+const defaultParams = { params: Promise.resolve({}) };
+
 function makeRequest(body?: unknown): Request {
   return new Request("http://localhost/api/kanban/columns", {
     method: body ? "POST" : "GET",
@@ -47,7 +49,7 @@ describe("GET /api/kanban/columns", () => {
 
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValue(null);
-    const res = await GET();
+    const res = await GET(makeRequest(), defaultParams);
     expect(res.status).toBe(401);
   });
 
@@ -58,7 +60,7 @@ describe("GET /api/kanban/columns", () => {
     ];
     mockPrisma.kanbanColumn.findMany.mockResolvedValue(columns);
 
-    const res = await GET();
+    const res = await GET(makeRequest(), defaultParams);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data).toEqual(columns);
@@ -71,7 +73,7 @@ describe("GET /api/kanban/columns", () => {
       .mockResolvedValueOnce([{ id: "col1", name: "Saved", applications: [] }]);
     mockPrisma.kanbanColumn.createMany.mockResolvedValue({ count: 6 });
 
-    const res = await GET();
+    const res = await GET(makeRequest(), defaultParams);
     expect(res.status).toBe(200);
     expect(mockPrisma.kanbanColumn.createMany).toHaveBeenCalledOnce();
     expect(mockPrisma.kanbanColumn.createMany.mock.calls[0][0].data).toHaveLength(6);
@@ -85,7 +87,7 @@ describe("POST /api/kanban/columns", () => {
 
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValue(null);
-    const res = await POST(makeRequest({ name: "Test", color: "#ff0000" }));
+    const res = await POST(makeRequest({ name: "Test", color: "#ff0000" }), defaultParams);
     expect(res.status).toBe(401);
   });
 
@@ -100,7 +102,7 @@ describe("POST /api/kanban/columns", () => {
       order: 3,
     });
 
-    const res = await POST(makeRequest({ name: "Custom", color: "#ff0000" }));
+    const res = await POST(makeRequest({ name: "Custom", color: "#ff0000" }), defaultParams);
     expect(res.status).toBe(201);
     const data = await res.json();
     expect(data.name).toBe("Custom");
@@ -110,19 +112,19 @@ describe("POST /api/kanban/columns", () => {
     mockAuth.mockResolvedValue({ user: { id: "user1" } });
     mockPrisma.kanbanColumn.count.mockResolvedValue(12);
 
-    const res = await POST(makeRequest({ name: "Extra", color: "#ff0000" }));
+    const res = await POST(makeRequest({ name: "Extra", color: "#ff0000" }), defaultParams);
     expect(res.status).toBe(400);
   });
 
   it("validates input — missing name", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user1" } });
-    const res = await POST(makeRequest({ color: "#ff0000" }));
+    const res = await POST(makeRequest({ color: "#ff0000" }), defaultParams);
     expect(res.status).toBe(400);
   });
 
   it("validates input — invalid color", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user1" } });
-    const res = await POST(makeRequest({ name: "Test", color: "notacolor" }));
+    const res = await POST(makeRequest({ name: "Test", color: "notacolor" }), defaultParams);
     expect(res.status).toBe(400);
   });
 });

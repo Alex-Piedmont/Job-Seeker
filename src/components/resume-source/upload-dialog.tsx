@@ -51,7 +51,6 @@ export function UploadDialog({ onImport }: UploadDialogProps) {
   };
 
   const handleConfirm = async () => {
-    console.log("[upload] fileContent length:", fileContent.length);
     setIsUploading(true);
     try {
       const res = await fetch("/api/resume-source/import", {

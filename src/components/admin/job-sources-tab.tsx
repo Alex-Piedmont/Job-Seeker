@@ -7,6 +7,8 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
+  ChevronLeft,
+  ChevronRight,
   Plus,
   Pencil,
   Trash2,
@@ -47,11 +49,16 @@ interface Company {
 type SortField = "name" | "atsPlatform" | "lastScrapeAt" | "enabled";
 type SortOrder = "asc" | "desc";
 
+const PAGE_SIZE = 50;
+
 export function JobSourcesTab() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortField>("name");
   const [order, setOrder] = useState<SortOrder>("asc");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Form dialog state
   const [formOpen, setFormOpen] = useState(false);
@@ -67,17 +74,19 @@ export function JobSourcesTab() {
   const fetchCompanies = useCallback(async () => {
     try {
       const res = await fetch(
-        `/api/admin/companies?sort=${sort}&order=${order}`
+        `/api/admin/companies?sort=${sort}&order=${order}&page=${page}&limit=${PAGE_SIZE}`
       );
       if (!res.ok) throw new Error("Failed to fetch companies");
       const data = await res.json();
       setCompanies(data.companies);
+      setTotalPages(data.pagination.totalPages);
+      setTotalCount(data.pagination.total);
     } catch {
       toast.error("Failed to load job sources");
     } finally {
       setLoading(false);
     }
-  }, [sort, order]);
+  }, [sort, order, page]);
 
   useEffect(() => {
     setLoading(true);
@@ -91,6 +100,7 @@ export function JobSourcesTab() {
       setSort(field);
       setOrder("asc");
     }
+    setPage(1);
   }
 
   function sortIcon(field: SortField) {
@@ -192,7 +202,7 @@ export function JobSourcesTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {companies.length} company source{companies.length !== 1 && "s"}
+          {totalCount} company source{totalCount !== 1 && "s"}
         </p>
         <Button size="sm" onClick={openCreate}>
           <Plus className="mr-1 h-4 w-4" />
@@ -342,6 +352,35 @@ export function JobSourcesTab() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              Next
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Company Form Dialog (Create / Edit) */}
       <CompanyForm

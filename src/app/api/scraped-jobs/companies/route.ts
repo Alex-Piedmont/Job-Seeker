@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { authenticatedHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-
+export const GET = authenticatedHandler(async (_request) => {
   const companies = await prisma.company.findMany({
     where: { enabled: true },
     select: {
@@ -23,5 +18,5 @@ export async function GET() {
     jobCount: _count.scrapedJobs,
   }));
 
-  return Response.json({ companies: formatted });
-}
+  return NextResponse.json({ companies: formatted });
+});

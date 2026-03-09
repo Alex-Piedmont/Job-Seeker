@@ -39,6 +39,8 @@ vi.mock("@/lib/prisma", () => ({
 
 import { POST } from "../route";
 
+const defaultParams = { params: Promise.resolve({}) };
+
 function makeRequest(body: unknown): Request {
   return new Request("http://localhost/api/kanban/applications", {
     method: "POST",
@@ -58,7 +60,7 @@ describe("POST /api/kanban/applications", () => {
 
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValue(null);
-    const res = await POST(makeRequest({ company: "Acme", role: "PM", columnId: "col1" }));
+    const res = await POST(makeRequest({ company: "Acme", role: "PM", columnId: "col1" }), defaultParams);
     expect(res.status).toBe(401);
   });
 
@@ -82,7 +84,7 @@ describe("POST /api/kanban/applications", () => {
     mockTx.jobApplication.create.mockResolvedValue(createdApp);
     mockTx.applicationStatusLog.create.mockResolvedValue({});
 
-    const res = await POST(makeRequest({ company: "Acme", role: "PM", columnId: "col1" }));
+    const res = await POST(makeRequest({ company: "Acme", role: "PM", columnId: "col1" }), defaultParams);
     expect(res.status).toBe(201);
     const data = await res.json();
     expect(data.serialNumber).toBe(1);
@@ -107,7 +109,7 @@ describe("POST /api/kanban/applications", () => {
     });
     mockTx.applicationStatusLog.create.mockResolvedValue({});
 
-    const res = await POST(makeRequest({ company: "Gamma", role: "Eng", columnId: "col1" }));
+    const res = await POST(makeRequest({ company: "Gamma", role: "Eng", columnId: "col1" }), defaultParams);
     expect(res.status).toBe(201);
     const data = await res.json();
     expect(data.serialNumber).toBe(3);
@@ -119,7 +121,7 @@ describe("POST /api/kanban/applications", () => {
     mockPrisma.user.findUnique.mockResolvedValue({ applicationCap: 5, role: "USER" });
     mockPrisma.jobApplication.count.mockResolvedValue(5);
 
-    const res = await POST(makeRequest({ company: "Too Many", role: "PM", columnId: "col1" }));
+    const res = await POST(makeRequest({ company: "Too Many", role: "PM", columnId: "col1" }), defaultParams);
     expect(res.status).toBe(403);
     const data = await res.json();
     expect(data.error).toContain("limit");
@@ -144,7 +146,7 @@ describe("POST /api/kanban/applications", () => {
     });
     mockTx.applicationStatusLog.create.mockResolvedValue({});
 
-    const res = await POST(makeRequest({ company: "Admin Co", role: "Admin", columnId: "col1" }));
+    const res = await POST(makeRequest({ company: "Admin Co", role: "Admin", columnId: "col1" }), defaultParams);
     expect(res.status).toBe(201);
   });
 
@@ -152,13 +154,13 @@ describe("POST /api/kanban/applications", () => {
     mockAuth.mockResolvedValue({ user: { id: "user1" } });
     mockPrisma.kanbanColumn.findFirst.mockResolvedValue(null);
 
-    const res = await POST(makeRequest({ company: "Test", role: "PM", columnId: "fake-col" }));
+    const res = await POST(makeRequest({ company: "Test", role: "PM", columnId: "fake-col" }), defaultParams);
     expect(res.status).toBe(404);
   });
 
   it("validates required fields", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user1" } });
-    const res = await POST(makeRequest({ company: "", role: "PM", columnId: "col1" }));
+    const res = await POST(makeRequest({ company: "", role: "PM", columnId: "col1" }), defaultParams);
     expect(res.status).toBe(400);
   });
 
@@ -182,7 +184,7 @@ describe("POST /api/kanban/applications", () => {
     });
     mockTx.applicationStatusLog.create.mockResolvedValue({});
 
-    const res = await POST(makeRequest({ company: "Acme", role: "PM", columnId: "col1" }));
+    const res = await POST(makeRequest({ company: "Acme", role: "PM", columnId: "col1" }), defaultParams);
     expect(res.status).toBe(201);
 
     const createCall = mockTx.jobApplication.create.mock.calls[0][0];

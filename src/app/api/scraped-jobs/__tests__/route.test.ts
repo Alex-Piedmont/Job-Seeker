@@ -16,8 +16,10 @@ vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 
 import { GET } from "../route";
 
+const defaultParams = { params: Promise.resolve({}) };
+
 function callGet(query = "") {
-  return GET(new Request(`http://localhost/api/scraped-jobs${query}`));
+  return GET(new Request(`http://localhost/api/scraped-jobs${query}`), defaultParams);
 }
 
 const sampleJob = {

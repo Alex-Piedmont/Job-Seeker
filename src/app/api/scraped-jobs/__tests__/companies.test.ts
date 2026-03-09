@@ -15,6 +15,8 @@ vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 
 import { GET } from "../companies/route";
 
+const defaultParams = { params: Promise.resolve({}) };
+
 describe("GET /api/scraped-jobs/companies", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -22,7 +24,7 @@ describe("GET /api/scraped-jobs/companies", () => {
 
   it("returns 401 when not authenticated", async () => {
     mockAuth.mockResolvedValue(null);
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/scraped-jobs/companies"), defaultParams);
     expect(res.status).toBe(401);
   });
 
@@ -33,7 +35,7 @@ describe("GET /api/scraped-jobs/companies", () => {
       { id: "c2", name: "Beta", _count: { scrapedJobs: 10 } },
     ]);
 
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/scraped-jobs/companies"), defaultParams);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.companies).toEqual([
@@ -46,7 +48,7 @@ describe("GET /api/scraped-jobs/companies", () => {
     mockAuth.mockResolvedValue({ user: { id: "user1" } });
     mockPrisma.company.findMany.mockResolvedValue([]);
 
-    await GET();
+    await GET(new Request("http://localhost/api/scraped-jobs/companies"), defaultParams);
 
     expect(mockPrisma.company.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

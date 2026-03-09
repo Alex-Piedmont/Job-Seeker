@@ -1,17 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { authenticatedHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<Record<string, string>> }
-) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-  const userId = session.user.id;
-  const { id } = await params;
+export const GET = authenticatedHandler(async (_request, { userId, params }) => {
+  const { id } = params;
 
   const job = await prisma.scrapedJob.findUnique({
     where: { id },
@@ -29,5 +21,5 @@ export async function GET(
   }
 
   const { userArchives, ...rest } = job;
-  return Response.json({ ...rest, isArchived: userArchives.length > 0 });
-}
+  return NextResponse.json({ ...rest, isArchived: userArchives.length > 0 });
+});

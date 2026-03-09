@@ -3,6 +3,7 @@
 import { MoreHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import type { DragHandleProps } from "@/types/kanban";
 
 interface ColumnHeaderProps {
   name: string;
@@ -11,8 +12,7 @@ interface ColumnHeaderProps {
   onSettingsClick: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  dragHandleProps?: any;
+  dragHandleProps?: DragHandleProps;
 }
 
 export function ColumnHeader({
@@ -27,7 +27,8 @@ export function ColumnHeader({
   return (
     <div
       className="flex items-center justify-between px-3 py-2.5 border-b border-border/30"
-      {...dragHandleProps}
+      {...dragHandleProps?.listeners}
+      {...dragHandleProps?.attributes}
     >
       <div className="flex items-center gap-2 min-w-0">
         {onToggleCollapse && (

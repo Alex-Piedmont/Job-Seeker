@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { authenticatedHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/prisma";
 import { validateBody } from "@/lib/validations";
 import { createColumnSchema } from "@/lib/validations/kanban";
 import { DEFAULT_COLUMNS } from "@/lib/kanban-utils";
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const userId = session.user.id;
-
+export const GET = authenticatedHandler(async (_request, { userId }) => {
   let columns = await prisma.kanbanColumn.findMany({
     where: { userId },
     orderBy: { order: "asc" },
@@ -97,15 +91,9 @@ export async function GET() {
   }
 
   return NextResponse.json(columns);
-}
+});
 
-export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const userId = session.user.id;
-
+export const POST = authenticatedHandler(async (request, { userId }) => {
   const validation = await validateBody(request, createColumnSchema);
   if (!validation.success) return validation.response;
   const { name, color } = validation.data;
@@ -131,4 +119,4 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json(column, { status: 201 });
-}
+});

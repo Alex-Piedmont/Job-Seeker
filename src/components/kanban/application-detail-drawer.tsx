@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { ChevronDown, Copy, Trash2, ExternalLink, AlertTriangle } from "lucide-react";
+import { Copy, Trash2, ExternalLink, AlertTriangle } from "lucide-react";
 import { GenerateButton } from "@/components/resume/generate-button";
 import { ResumeEditor } from "@/components/resume/resume-editor";
 import { DownloadButton } from "@/components/resume/download-button";
@@ -19,6 +19,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { useResizableDrawer } from "@/hooks/use-resizable-drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -39,53 +41,7 @@ import { NotesSection } from "./notes-section";
 import { computeOTE, formatCurrency } from "@/lib/kanban-utils";
 import { GRADE_COLORS, type ReviewResult } from "@/lib/resume-prompts/review";
 import { CheckCircle, ArrowRight } from "lucide-react";
-
-interface Column {
-  id: string;
-  name: string;
-  color: string;
-  columnType: string | null;
-}
-
-interface ApplicationDetail {
-  id: string;
-  serialNumber: number;
-  columnId: string;
-  company: string;
-  role: string;
-  hiringManager: string | null;
-  hiringOrg: string | null;
-  postingNumber: string | null;
-  postingUrl: string | null;
-  locationType: string | null;
-  primaryLocation: string | null;
-  additionalLocations: string | null;
-  salaryMin: number | null;
-  salaryMax: number | null;
-  bonusTargetPct: number | null;
-  variableComp: number | null;
-  referrals: string | null;
-  datePosted: string | null;
-  dateApplied: string | null;
-  rejectionDate: string | null;
-  closedReason: string | null;
-  jobDescription: string | null;
-  createdAt: string;
-  updatedAt: string;
-  interviews: Array<{
-    id: string;
-    type: string;
-    format: string;
-    people: string | null;
-    date: string | null;
-    notes: string | null;
-    sortOrder: number;
-  }>;
-  notes: Array<{ id: string; content: string; createdAt: string }>;
-  column: { id: string; name: string; columnType: string | null };
-  scrapedJobId: string | null;
-  scrapedJob: { removedAt: string | null } | null;
-}
+import type { Column, ApplicationDetail } from "@/types/kanban";
 
 interface ApplicationDetailDrawerProps {
   applicationId: string;
@@ -94,41 +50,6 @@ interface ApplicationDetailDrawerProps {
   onUpdated: () => void;
   onDeleted: () => void;
   onDuplicated: (newId: string) => void;
-}
-
-interface CollapsibleSectionProps {
-  title: string;
-  defaultOpen?: boolean;
-  badge?: string;
-  children: React.ReactNode;
-}
-
-function CollapsibleSection({
-  title,
-  defaultOpen = true,
-  badge,
-  children,
-}: CollapsibleSectionProps) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div>
-      <button
-        className="flex items-center gap-2 w-full min-h-[44px] py-2.5 text-sm font-medium hover:text-foreground/80"
-        onClick={() => setOpen(!open)}
-      >
-        <ChevronDown
-          className={`h-4 w-4 transition-transform ${open ? "" : "-rotate-90"}`}
-        />
-        {title}
-        {badge && (
-          <Badge variant="secondary" className="text-xs ml-1">
-            {badge}
-          </Badge>
-        )}
-      </button>
-      {open && <div className="pl-6 space-y-3 pb-2">{children}</div>}
-    </div>
-  );
 }
 
 export function ApplicationDetailDrawer({
@@ -147,61 +68,7 @@ export function ApplicationDetailDrawer({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUpdates = useRef<Record<string, unknown>>({});
 
-  // Resizable drawer width
-  const DRAWER_MIN_W = 400;
-  const DRAWER_MAX_W_RATIO = 0.9;
-  const DRAWER_STORAGE_KEY = "drawer-width";
-  const [drawerWidth, setDrawerWidth] = useState<number | null>(null);
-  const isResizing = useRef(false);
-
-  // Load persisted width
-  useLayoutEffect(() => {
-    const stored = localStorage.getItem(DRAWER_STORAGE_KEY);
-    if (stored) {
-      const w = parseInt(stored, 10);
-      if (!isNaN(w)) {
-        setDrawerWidth(Math.min(Math.max(w, DRAWER_MIN_W), window.innerWidth * DRAWER_MAX_W_RATIO));
-        return;
-      }
-    }
-    // Default: 60% of viewport, capped at 672px (max-w-2xl)
-    setDrawerWidth(Math.min(window.innerWidth * 0.6, 672));
-  }, []);
-
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    const startX = e.clientX;
-    const startWidth = drawerWidth ?? 672;
-
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isResizing.current) return;
-      const delta = startX - ev.clientX;
-      const newWidth = Math.min(
-        Math.max(startWidth + delta, DRAWER_MIN_W),
-        window.innerWidth * DRAWER_MAX_W_RATIO
-      );
-      setDrawerWidth(newWidth);
-    };
-
-    const onMouseUp = () => {
-      isResizing.current = false;
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      // Persist
-      setDrawerWidth((w) => {
-        if (w) localStorage.setItem(DRAWER_STORAGE_KEY, String(Math.round(w)));
-        return w;
-      });
-    };
-
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }, [drawerWidth]);
+  const { drawerWidth, handleResizeStart } = useResizableDrawer();
 
   // Resume generation state
   const [hasResumeSource, setHasResumeSource] = useState(false);
