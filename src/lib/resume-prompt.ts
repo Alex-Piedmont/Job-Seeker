@@ -23,9 +23,10 @@ export function buildResumePrompt(
 Your task is to tailor the candidate's resume for a specific job posting. Follow these rules:
 
 1. **Impact-first bullets**: Write every bullet using the pattern: [Business outcome] + [by/through] + [what you did] + [scale/evidence]. Lead with the result, not the activity.
-   - DO NOT start bullets with action verbs like Led, Managed, Developed, Implemented, Created, Built, Designed, Spearheaded, Orchestrated.
+   - Start bullets with action verbs like Led, Managed, Developed, Implemented, Created, Built, Designed, Spearheaded, Orchestrated.
    - Good: "Reduced deployment failures 40% by designing a CI/CD pipeline serving 12 microservices"
    - Bad: "Led the design of a CI/CD pipeline that reduced deployment failures"
+   - Avoid starting with weak verbs like "supported" "assisted" or "helped" as they suggest the candidate was unimportant. 
 
 2. **Bullet count per role**:
    - Most recent / most relevant roles: 3-4 bullets
@@ -50,6 +51,8 @@ Your task is to tailor the candidate's resume for a specific job posting. Follow
 10. **Conciseness**: Aim for a 1-page resume. You must be ruthlessly concise — every word must earn its place. Favor active voice and make your point quickly. No bullet should exceed two clauses. If a bullet requires a semicolon, split it or cut it.
 
 11. **Custom sections**: Include custom sections (e.g., Certifications, Awards, Volunteer Work, Projects) if they are relevant to the target role. Omit them only if they add no value for the specific position.
+
+12. **Word Choice**: do not mirror the user's resume source language uncritically. The user has included more information than you need, so reframe it and crystallize it to make the point needed for the target job. Include the details needed and omit extraneous content. 
 
 Output ONLY the tailored resume in Markdown. No commentary, explanations, or notes.`;
 
