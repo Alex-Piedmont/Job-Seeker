@@ -193,7 +193,7 @@ export function StepReview({
     setRevisionNotes("");
   }
 
-  if (generating && !generation) {
+  if (generating) {
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-3" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
