@@ -6,29 +6,34 @@ export const GRADE_COLORS: Record<string, string> = {
   F: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
 };
 
-export interface ReviewResult {
+export interface ReviewScorecardResult {
   keywordAlignment: {
     matched: string[];
     missing: string[];
   };
   narrativeCoherence: string;
-  bulletImprovements: Array<{
-    original: string;
-    suggested: string;
-    reason: string;
-  }>;
   gapsAndRisks: string[];
   overallGrade: "A" | "B" | "C" | "D" | "F";
   gradeJustification: string;
 }
 
-export const REVIEW_SYSTEM = `You are an expert resume reviewer and hiring consultant. Evaluate the tailored resume against the target job description for keyword alignment, narrative coherence, bullet quality, and gaps.
+export interface ReviewBulletsResult {
+  bulletImprovements: Array<{
+    original: string;
+    suggested: string;
+    reason: string;
+  }>;
+}
 
-If the target company is well-known (e.g., FAANG, major consultancies, Fortune 500), evaluate whether the resume signals the right cultural values. For example, Amazon resumes should reflect leadership principles like Customer Obsession and Ownership; Google resumes should demonstrate impact at scale and collaboration. Flag missing cultural signals and suggest how bullets could be reframed to better align.
+export interface ReviewResult extends ReviewScorecardResult, ReviewBulletsResult {}
 
-Be specific and actionable in your feedback. Reference exact bullets and phrases. Grade honestly — an "A" means the resume would likely pass ATS screening AND impress a hiring manager for this specific role.
+export const REVIEW_SCORECARD_SYSTEM = `You are an expert resume reviewer and hiring consultant. Evaluate the tailored resume against the target job description for keyword alignment, narrative coherence, and gaps.
 
-Keep all text fields concise (1-3 sentences). Limit bullet improvements to the 5 most impactful changes. For keywords, list only the most relevant terms (up to 10 matched, up to 8 missing).
+If the target company is well-known (e.g., FAANG, major consultancies, Fortune 500), evaluate whether the resume signals the right cultural values. For example, Amazon resumes should reflect leadership principles like Customer Obsession and Ownership; Google resumes should demonstrate impact at scale and collaboration. Flag missing cultural signals.
+
+Be specific and actionable in your feedback. Grade honestly — an "A" means the resume would likely pass ATS screening AND impress a hiring manager for this specific role.
+
+Keep all text fields concise (1-3 sentences). For keywords, list only the most relevant terms (up to 10 matched, up to 8 missing).
 
 Grading rubric:
 - A: Strong keyword alignment, impact-first bullets with quantified results, clear narrative arc, no significant gaps
@@ -37,9 +42,17 @@ Grading rubric:
 - D: Weak alignment, mostly activity-first bullets, unclear narrative, significant gaps
 - F: Poor alignment, generic bullets, no clear connection to the target role`;
 
-export const REVIEW_TOOL = {
-  name: "resume_review",
-  description: "Structured review and scoring of a tailored resume against a job description",
+export const REVIEW_BULLETS_SYSTEM = `You are an expert resume reviewer and hiring consultant. Your task is to suggest the most impactful bullet improvements for the tailored resume based on the target job description.
+
+Focus on bullets that could be rewritten to better demonstrate impact, quantify results, align with the JD's key requirements, or reflect the target company's culture and values.
+
+For each improvement, provide the exact original bullet text, a rewritten version leading with business impact, and a brief reason explaining why the change matters.
+
+Limit to exactly 5 bullet improvements — pick the ones that would make the biggest difference.`;
+
+export const REVIEW_SCORECARD_TOOL = {
+  name: "resume_scorecard",
+  description: "Structured scoring and assessment of a tailored resume against a job description",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -56,20 +69,6 @@ export const REVIEW_TOOL = {
         type: "string",
         description: "Assessment of how well the resume tells a coherent story aligned with the target role",
       },
-      bulletImprovements: {
-        type: "array",
-        description: "Top 5 most impactful bullet improvements",
-        maxItems: 5,
-        items: {
-          type: "object",
-          properties: {
-            original: { type: "string" },
-            suggested: { type: "string" },
-            reason: { type: "string" },
-          },
-          required: ["original", "suggested", "reason"],
-        },
-      },
       gapsAndRisks: {
         type: "array",
         description: "Gaps between the resume and JD that a hiring manager would notice",
@@ -85,7 +84,32 @@ export const REVIEW_TOOL = {
         description: "Brief justification for the grade",
       },
     },
-    required: ["keywordAlignment", "narrativeCoherence", "bulletImprovements", "gapsAndRisks", "overallGrade", "gradeJustification"],
+    required: ["keywordAlignment", "narrativeCoherence", "gapsAndRisks", "overallGrade", "gradeJustification"],
+  },
+};
+
+export const REVIEW_BULLETS_TOOL = {
+  name: "resume_bullet_improvements",
+  description: "Top 5 most impactful bullet improvements for a tailored resume",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      bulletImprovements: {
+        type: "array",
+        description: "Top 5 most impactful bullet improvements",
+        maxItems: 5,
+        items: {
+          type: "object",
+          properties: {
+            original: { type: "string" },
+            suggested: { type: "string" },
+            reason: { type: "string" },
+          },
+          required: ["original", "suggested", "reason"],
+        },
+      },
+    },
+    required: ["bulletImprovements"],
   },
 };
 
@@ -103,5 +127,5 @@ ${jobDescription}
 
 ---
 
-Review this tailored resume against the job description. Evaluate keyword alignment, narrative coherence, bullet quality, gaps, and assign an overall grade.`;
+Review this tailored resume against the job description.`;
 }

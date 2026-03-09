@@ -5,13 +5,19 @@ import { reviewResumeSchema } from "@/lib/validations/resume";
 import { prisma } from "@/lib/prisma";
 import { callWithTool, estimateCost } from "@/lib/anthropic";
 import {
-  REVIEW_SYSTEM,
-  REVIEW_TOOL,
+  REVIEW_SCORECARD_SYSTEM,
+  REVIEW_BULLETS_SYSTEM,
+  REVIEW_SCORECARD_TOOL,
+  REVIEW_BULLETS_TOOL,
   buildReviewUserMessage,
   type ReviewResult,
+  type ReviewScorecardResult,
+  type ReviewBulletsResult,
 } from "@/lib/resume-prompts/review";
 
 export const maxDuration = 120;
+
+const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
 export const POST = authenticatedHandler(async (request, { userId }) => {
   const validation = await validateBody(request, reviewResumeSchema);
@@ -38,20 +44,43 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
     );
   }
 
-  const result = await callWithTool<ReviewResult>(
-    REVIEW_SYSTEM,
-    buildReviewUserMessage(resumeMarkdown, application.jobDescription),
-    REVIEW_TOOL,
-    { maxTokens: 8192 }
+  const userMessage = buildReviewUserMessage(
+    resumeMarkdown,
+    application.jobDescription
   );
 
-  const cost = estimateCost(result.promptTokens, result.completionTokens);
+  const [scorecardResult, bulletsResult] = await Promise.all([
+    callWithTool<ReviewScorecardResult>(
+      REVIEW_SCORECARD_SYSTEM,
+      userMessage,
+      REVIEW_SCORECARD_TOOL,
+      { model: HAIKU_MODEL, maxTokens: 4096 }
+    ),
+    callWithTool<ReviewBulletsResult>(
+      REVIEW_BULLETS_SYSTEM,
+      userMessage,
+      REVIEW_BULLETS_TOOL,
+      { model: HAIKU_MODEL, maxTokens: 4096 }
+    ),
+  ]);
+
+  const review: ReviewResult = {
+    ...scorecardResult.data,
+    ...bulletsResult.data,
+  };
+
+  const promptTokens =
+    scorecardResult.promptTokens + bulletsResult.promptTokens;
+  const completionTokens =
+    scorecardResult.completionTokens + bulletsResult.completionTokens;
+  const totalTokens = promptTokens + completionTokens;
+  const cost = estimateCost(promptTokens, completionTokens);
 
   // Persist review to the generation record
   if (generationId) {
     await prisma.resumeGeneration.update({
       where: { id: generationId, userId },
-      data: { reviewJson: JSON.stringify(result.data) },
+      data: { reviewJson: JSON.stringify(review) },
     });
   }
 
@@ -60,18 +89,18 @@ export const POST = authenticatedHandler(async (request, { userId }) => {
       userId,
       jobApplicationId,
       callType: "review",
-      promptTokens: result.promptTokens,
-      completionTokens: result.completionTokens,
-      totalTokens: result.totalTokens,
+      promptTokens,
+      completionTokens,
+      totalTokens,
       estimatedCost: cost,
-      modelId: result.modelId,
+      modelId: HAIKU_MODEL,
     },
   });
 
   return NextResponse.json({
-    review: result.data,
-    promptTokens: result.promptTokens,
-    completionTokens: result.completionTokens,
+    review,
+    promptTokens,
+    completionTokens,
     estimatedCost: cost,
   });
 }, { rateLimit: "resume-review" });
