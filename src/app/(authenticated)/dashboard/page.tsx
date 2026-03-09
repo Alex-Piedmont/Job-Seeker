@@ -8,6 +8,7 @@ import {
   BarChart3,
   Sparkles,
   ArrowRight,
+  Megaphone,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -105,6 +106,28 @@ export default function DashboardPage() {
           applications, and land interviews faster.
         </p>
       </div>
+
+      {/* Updates & Announcements */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Megaphone className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Updates</h2>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <ul className="space-y-3 text-sm text-muted-foreground">
+              <li className="flex gap-2">
+                <span className="shrink-0 font-medium text-foreground">Mar 2026</span>
+                <span>
+                  We&apos;re now importing job listings from <strong className="text-foreground">70+ companies</strong> with
+                  more being added consistently. Ongoing QA is in progress as we verify each
+                  source. Over <strong className="text-foreground">6,800+ roles</strong> are currently listed and growing.
+                </span>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+      </section>
 
       {/* Getting Started Steps */}
       <section>
