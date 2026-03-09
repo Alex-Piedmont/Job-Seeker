@@ -5,7 +5,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { scrapeGreenhouse, scrapeLever, scrapeWorkday, scrapeICIMS } from "./adapters";
+import { scrapeGreenhouse, scrapeLever, scrapeWorkday, scrapeICIMS, scrapeOracle, scrapeSuccessFactors } from "./adapters";
 import type { ScrapedJobData } from "./adapters";
 import { upsertJob, upsertJobs } from "./job-store";
 
@@ -13,6 +13,16 @@ const batchScrapers: Record<string, (company: { name: string; baseUrl: string })
   GREENHOUSE: scrapeGreenhouse,
   LEVER: scrapeLever,
   ICIMS: scrapeICIMS,
+  SUCCESSFACTORS: scrapeSuccessFactors,
+};
+
+/** Adapters that fetch per-job details and benefit from streaming upsert. */
+const streamScrapers: Record<
+  string,
+  (company: { name: string; baseUrl: string }, onJob: (job: ScrapedJobData) => Promise<void>) => Promise<ScrapedJobData[]>
+> = {
+  WORKDAY: scrapeWorkday,
+  ORACLE: scrapeOracle,
 };
 
 export async function scrapeCompany(company: {
@@ -22,9 +32,9 @@ export async function scrapeCompany(company: {
   atsPlatform: string;
 }): Promise<void> {
   const batchScraper = batchScrapers[company.atsPlatform];
-  const isWorkday = company.atsPlatform === "WORKDAY";
+  const streamScraper = streamScrapers[company.atsPlatform];
 
-  if (!batchScraper && !isWorkday) {
+  if (!batchScraper && !streamScraper) {
     console.log(
       `[scrape] Skipping initial scrape for ${company.name} — ` +
       `${company.atsPlatform} requires Playwright (will scrape on next cron run)`,
@@ -37,10 +47,10 @@ export async function scrapeCompany(company: {
   let error: string | null = null;
 
   try {
-    if (isWorkday) {
+    if (streamScraper) {
       // Stream jobs to DB one at a time so partial results survive timeouts
       let count = 0;
-      await scrapeWorkday(company, async (job) => {
+      await streamScraper(company, async (job) => {
         await upsertJob(company.id, job);
         count++;
       });

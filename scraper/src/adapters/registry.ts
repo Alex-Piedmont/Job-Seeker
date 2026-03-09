@@ -3,12 +3,16 @@ import { GreenhouseAdapter } from "./greenhouse.js";
 import { LeverAdapter } from "./lever.js";
 import { WorkdayAdapter } from "./workday.js";
 import { ICIMSAdapter } from "./icims.js";
+import { OracleAdapter } from "./oracle.js";
+import { SuccessFactorsAdapter } from "./successfactors.js";
 
 const adapters: Record<string, AtsAdapter> = {
   GREENHOUSE: new GreenhouseAdapter(),
   LEVER: new LeverAdapter(),
   WORKDAY: new WorkdayAdapter(),
   ICIMS: new ICIMSAdapter(),
+  ORACLE: new OracleAdapter(),
+  SUCCESSFACTORS: new SuccessFactorsAdapter(),
 };
 
 export function getAdapter(platform: string): AtsAdapter {

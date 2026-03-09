@@ -182,6 +182,136 @@ export async function scrapeGreenhouse(company: { name: string; baseUrl: string 
 }
 
 // ---------------------------------------------------------------------------
+// SAP SuccessFactors (XML feed)
+// ---------------------------------------------------------------------------
+
+interface SFJob {
+  JobTitle: string | { __cdata: string };
+  "Job-Description": string | { __cdata: string };
+  ReqId: string | number;
+  "Posted-Date"?: string;
+  filter1?: { label: string; value: string } | string;
+  filter2?: { label: string; value: string } | string;
+  filter3?: { label: string; value: string } | string;
+}
+
+function parseSuccessFactorsUrl(baseUrl: string): { host: string; companyId: string } {
+  const url = new URL(baseUrl);
+  const companyId = url.searchParams.get("company");
+  if (!companyId) {
+    throw new Error(`Cannot parse SuccessFactors URL – missing ?company= parameter: ${baseUrl}`);
+  }
+  return { host: url.host, companyId };
+}
+
+function sfExtractLocation(job: SFJob): string | null {
+  for (const key of ["filter1", "filter2", "filter3"] as const) {
+    const filter = job[key];
+    if (filter && typeof filter === "object" && "label" in filter) {
+      const label = filter.label.toLowerCase();
+      if (label.includes("location") || label.includes("city") || label.includes("state") || label.includes("office")) {
+        return filter.value;
+      }
+    }
+  }
+  return null;
+}
+
+function sfExtractDepartment(job: SFJob): string | null {
+  for (const key of ["filter1", "filter2", "filter3"] as const) {
+    const filter = job[key];
+    if (filter && typeof filter === "object" && "label" in filter) {
+      const label = filter.label.toLowerCase();
+      if (label.includes("department") || label.includes("area") || label.includes("team") || label.includes("division")) {
+        return filter.value;
+      }
+    }
+  }
+  return null;
+}
+
+function sfParsePostedDate(dateStr: string | undefined): string | null {
+  if (!dateStr) return null;
+  const match = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, month, day, year] = match;
+  return `${year}-${month}-${day}`;
+}
+
+function sfGetText(field: string | { __cdata: string } | undefined): string {
+  if (!field) return "";
+  if (typeof field === "object" && "__cdata" in field) return field.__cdata;
+  return String(field);
+}
+
+export async function scrapeSuccessFactors(company: { name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
+  const { host, companyId } = parseSuccessFactorsUrl(company.baseUrl);
+  const feedUrl = `https://${host}/career?company=${encodeURIComponent(companyId)}&career_ns=job_listing_summary&resultType=XML`;
+
+  const res = await fetch(feedUrl, {
+    headers: { "User-Agent": USER_AGENT },
+  });
+
+  if (!res.ok) {
+    throw new Error(`SuccessFactors XML feed returned ${res.status} for ${company.name}`);
+  }
+
+  const xml = await res.text();
+
+  if (!xml.trimStart().startsWith("<?xml") && !xml.trimStart().startsWith("<Job-Listing")) {
+    throw new Error(`SuccessFactors returned non-XML response for ${company.name}`);
+  }
+
+  // Dynamic import to avoid bundling fast-xml-parser unless needed
+  const { XMLParser } = await import("fast-xml-parser");
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    cdataPropName: "__cdata",
+    isArray: (name: string) => name === "Job",
+  });
+
+  const parsed = parser.parse(xml) as { "Job-Listing": { Job?: SFJob | SFJob[] } };
+  const jobList = parsed["Job-Listing"]?.Job;
+  if (!jobList) return [];
+
+  const rawJobs = Array.isArray(jobList) ? jobList : [jobList];
+  const jobs: ScrapedJobData[] = [];
+
+  for (const job of rawJobs) {
+    const title = sfGetText(job.JobTitle);
+    const descriptionHtml = sfGetText(job["Job-Description"]);
+    const reqId = String(job.ReqId);
+
+    if (!title || !reqId) continue;
+
+    const location = sfExtractLocation(job);
+    if (location && !isUSLocation(location)) continue;
+
+    const salary = extractSalaryFromHtml(descriptionHtml);
+    if (salary.isHourly) continue;
+
+    const jobUrl = `https://${host}/career?company=${encodeURIComponent(companyId)}&career_ns=job_listing&career_job_req_id=${reqId}`;
+
+    jobs.push({
+      externalJobId: reqId,
+      title,
+      url: jobUrl,
+      department: sfExtractDepartment(job),
+      locations: location ? [location] : [],
+      locationType: inferLocationType([location ?? "", descriptionHtml].join(" ")),
+      salaryMin: salary.min,
+      salaryMax: salary.max,
+      salaryCurrency: "USD",
+      jobDescriptionHtml: descriptionHtml,
+      postedAt: sfParsePostedDate(job["Posted-Date"]),
+      postingEndDate: null,
+    });
+  }
+
+  return jobs;
+}
+
+// ---------------------------------------------------------------------------
 // Lever
 // ---------------------------------------------------------------------------
 
@@ -499,6 +629,167 @@ export async function scrapeICIMS(company: { name: string; baseUrl: string }): P
     }
 
     page++;
+    await delay(BETWEEN_REQUESTS_MS);
+  }
+
+  return jobs;
+}
+
+// ---------------------------------------------------------------------------
+// Oracle HCM Cloud (CE JSON API)
+// ---------------------------------------------------------------------------
+
+interface OracleRequisition {
+  Id: string;
+  Title: string;
+  PostedDate: string | null;
+  PostingEndDate: string | null;
+  PrimaryLocation: string;
+  PrimaryLocationCountry: string;
+  WorkplaceTypeCode: string | null;
+  JobFamily: string | null;
+  Department: string | null;
+  Organization: string | null;
+  JobType: string | null;
+}
+
+interface OracleListResponse {
+  items: Array<{
+    TotalJobsCount: number;
+    requisitionList: OracleRequisition[];
+  }>;
+}
+
+interface OracleDetailResponse {
+  items: Array<{
+    Id: string;
+    Title: string;
+    ExternalDescriptionStr: string | null;
+    ExternalQualificationsStr: string | null;
+    ExternalResponsibilitiesStr: string | null;
+    PrimaryLocation: string;
+    PrimaryLocationCountry: string;
+    WorkplaceTypeCode: string | null;
+    PostedDate: string | null;
+    PostingEndDate: string | null;
+    JobFamily: string | null;
+    Department: string | null;
+    Organization: string | null;
+    secondaryLocations?: Array<{ LocationName: string }>;
+  }>;
+}
+
+function parseOracleUrl(baseUrl: string): { host: string; siteNumber: string } {
+  const url = new URL(baseUrl);
+  const segments = url.pathname.split("/").filter(Boolean);
+  const sitesIdx = segments.indexOf("sites");
+  if (sitesIdx === -1 || sitesIdx + 1 >= segments.length) {
+    throw new Error(`Cannot parse Oracle HCM URL – expected /sites/{siteNumber} path: ${baseUrl}`);
+  }
+  return { host: url.host, siteNumber: segments[sitesIdx + 1] };
+}
+
+function mapWorkplaceType(code: string | null | undefined): string | null {
+  if (!code) return null;
+  const lower = code.toLowerCase();
+  if (lower.includes("remote")) return "Remote";
+  if (lower.includes("hybrid")) return "Hybrid";
+  return null;
+}
+
+const ORACLE_API_VERSION = "11.13.18.05";
+const ORACLE_PAGE_SIZE = 25;
+
+export async function scrapeOracle(
+  company: { name: string; baseUrl: string },
+  onJob?: (job: ScrapedJobData) => Promise<void>,
+): Promise<ScrapedJobData[]> {
+  const { host, siteNumber } = parseOracleUrl(company.baseUrl);
+  const apiBase = `https://${host}/hcmRestApi/resources/${ORACLE_API_VERSION}`;
+
+  const jobs: ScrapedJobData[] = [];
+  let offset = 0;
+  let totalJobs = -1;
+
+  while (true) {
+    const listUrl = `${apiBase}/recruitingCEJobRequisitions?finder=findReqs;siteNumber=${siteNumber},limit=${ORACLE_PAGE_SIZE},offset=${offset},sortBy=POSTING_DATES_DESC&onlyData=true&expand=requisitionList`;
+
+    const res = await fetch(listUrl, {
+      headers: { "User-Agent": USER_AGENT },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Oracle HCM API returned ${res.status} for ${company.name} (offset ${offset})`);
+    }
+
+    const data = (await res.json()) as OracleListResponse;
+    const wrapper = data.items?.[0];
+    if (!wrapper?.requisitionList?.length) break;
+
+    if (totalJobs < 0) totalJobs = wrapper.TotalJobsCount;
+
+    for (const req of wrapper.requisitionList) {
+      if (req.PrimaryLocationCountry !== "US") continue;
+      if (req.JobType && !req.JobType.toLowerCase().includes("regular")) continue;
+
+      try {
+        await delay(BETWEEN_REQUESTS_MS);
+
+        const detailUrl = `${apiBase}/recruitingCEJobRequisitionDetails/${req.Id}?onlyData=true&expand=all`;
+        const detailRes = await fetch(detailUrl, {
+          headers: { "User-Agent": USER_AGENT },
+        });
+
+        if (!detailRes.ok) continue;
+
+        const detailData = (await detailRes.json()) as OracleDetailResponse;
+        const detail = detailData.items?.[0];
+        if (!detail) continue;
+
+        const descriptionParts = [
+          detail.ExternalDescriptionStr,
+          detail.ExternalQualificationsStr,
+          detail.ExternalResponsibilitiesStr,
+        ].filter(Boolean);
+        const descriptionHtml = descriptionParts.join("\n");
+
+        const locations: string[] = [detail.PrimaryLocation].filter(Boolean);
+        if (detail.secondaryLocations) {
+          for (const loc of detail.secondaryLocations) {
+            if (loc.LocationName) locations.push(loc.LocationName);
+          }
+        }
+
+        const salary = extractSalaryFromHtml(descriptionHtml);
+        if (salary.isHourly) continue;
+
+        const jobUrl = `https://${host}/hcmUI/CandidateExperience/en/sites/${siteNumber}/job/${req.Id}`;
+
+        const job: ScrapedJobData = {
+          externalJobId: req.Id,
+          title: req.Title,
+          url: jobUrl,
+          department: detail.Department ?? detail.Organization ?? detail.JobFamily ?? null,
+          locations,
+          locationType: mapWorkplaceType(detail.WorkplaceTypeCode ?? req.WorkplaceTypeCode),
+          salaryMin: salary.min,
+          salaryMax: salary.max,
+          salaryCurrency: "USD",
+          jobDescriptionHtml: descriptionHtml,
+          postedAt: req.PostedDate ?? null,
+          postingEndDate: req.PostingEndDate ?? null,
+        };
+
+        jobs.push(job);
+        if (onJob) await onJob(job);
+      } catch {
+        // Skip individual job failures
+      }
+    }
+
+    offset += wrapper.requisitionList.length;
+    if (offset >= totalJobs) break;
+
     await delay(BETWEEN_REQUESTS_MS);
   }
 

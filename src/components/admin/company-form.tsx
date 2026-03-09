@@ -28,7 +28,7 @@ interface CompanyFormProps {
   onSaved: () => void;
 }
 
-const ATS_PLATFORMS = ["GREENHOUSE", "LEVER", "WORKDAY", "ICIMS"] as const;
+const ATS_PLATFORMS = ["GREENHOUSE", "LEVER", "WORKDAY", "ICIMS", "ORACLE", "SUCCESSFACTORS"] as const;
 
 export function CompanyForm({ open, onOpenChange, company, onSaved }: CompanyFormProps) {
   const isEdit = Boolean(company);

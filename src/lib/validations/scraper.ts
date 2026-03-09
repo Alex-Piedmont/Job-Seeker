@@ -4,7 +4,7 @@ const booleanString = z
   .union([z.boolean(), z.string()])
   .transform((val) => (typeof val === "string" ? val === "true" : val));
 
-const atsPlatformValues = ["GREENHOUSE", "LEVER", "WORKDAY", "ICIMS"] as const;
+const atsPlatformValues = ["GREENHOUSE", "LEVER", "WORKDAY", "ICIMS", "ORACLE", "SUCCESSFACTORS"] as const;
 
 export const createCompanySchema = z.object({
   name: z.string().min(1, "Name is required").max(200, "Name must be 200 characters or less"),

@@ -24,6 +24,8 @@ enum AtsPlatform {
   LEVER
   WORKDAY
   ICIMS
+  ORACLE
+  SUCCESSFACTORS
 }
 
 enum ScrapeStatus {
