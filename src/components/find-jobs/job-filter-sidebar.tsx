@@ -53,6 +53,7 @@ export const emptyFilters: FilterValues = {
 
 export function JobFilterSidebar({ filters, companies, onFilterChange, onClearAll }: JobFilterSidebarProps) {
   const [companyOpen, setCompanyOpen] = useState(false);
+  const [companySearch, setCompanySearch] = useState("");
 
   const update = (partial: Partial<FilterValues>) => {
     onFilterChange({ ...filters, ...partial });
@@ -158,7 +159,7 @@ export function JobFilterSidebar({ filters, companies, onFilterChange, onClearAl
       {/* Company multi-select */}
       <div className="space-y-1.5">
         <Label className="text-xs">Company</Label>
-        <Popover open={companyOpen} onOpenChange={setCompanyOpen}>
+        <Popover open={companyOpen} onOpenChange={(open) => { setCompanyOpen(open); if (!open) setCompanySearch(""); }}>
           <PopoverTrigger asChild>
             <Button variant="outline" className="w-full justify-between h-8 text-sm font-normal">
               {filters.companyIds.length > 0
@@ -168,8 +169,16 @@ export function JobFilterSidebar({ filters, companies, onFilterChange, onClearAl
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[240px] p-0" align="start">
+            <div className="p-1 pb-0">
+              <Input
+                placeholder="Search companies..."
+                value={companySearch}
+                onChange={(e) => setCompanySearch(e.target.value)}
+                className="h-7 text-sm"
+              />
+            </div>
             <div className="max-h-[240px] overflow-y-auto p-1">
-              {companies.map((c) => (
+              {companies.filter((c) => c.name.toLowerCase().includes(companySearch.toLowerCase())).map((c) => (
                 <button
                   key={c.id}
                   className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
@@ -180,7 +189,7 @@ export function JobFilterSidebar({ filters, companies, onFilterChange, onClearAl
                   <span className="text-xs text-muted-foreground">({c.jobCount})</span>
                 </button>
               ))}
-              {companies.length === 0 && (
+              {companies.filter((c) => c.name.toLowerCase().includes(companySearch.toLowerCase())).length === 0 && (
                 <p className="p-2 text-sm text-muted-foreground">No companies found</p>
               )}
             </div>
