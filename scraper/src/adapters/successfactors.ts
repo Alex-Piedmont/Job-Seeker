@@ -1,4 +1,4 @@
-import type { AtsAdapter, ScrapedJobData } from "./types.js";
+import type { AtsAdapter, ScrapedJobData, ExistingJobRecord } from "./types.js";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 import { isUSLocation } from "../utils/location-filter.js";
@@ -107,7 +107,10 @@ function parsePostedDate(dateStr: string | undefined): string | null {
 // ---------------------------------------------------------------------------
 
 export class SuccessFactorsAdapter implements AtsAdapter {
-  async listJobs(company: { id: string; name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
+  async listJobs(
+    company: { id: string; name: string; baseUrl: string; atsPlatform: string; lastScrapeAt: Date | null },
+    _existingJobs?: Map<string, ExistingJobRecord>,
+  ): Promise<ScrapedJobData[]> {
     const { host, companyId } = parseSuccessFactorsUrl(company.baseUrl);
 
     // Fetch the XML feed — returns all jobs in a single response (no pagination)

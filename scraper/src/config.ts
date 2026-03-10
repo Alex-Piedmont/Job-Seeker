@@ -4,14 +4,25 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL!,
   userAgent: "JobSeekerBot/1.0 (+https://jobseeker.app/bot)",
   delays: {
-    betweenRequests: 500,     // 500ms between API requests
-    betweenPages: 2500,       // 2.5s between Playwright page navigations
     rateLimitWait: 60000,     // 60s wait on 429
   },
   retries: {
     network: 3,
     rateLimit: 1,
     serverError: 2,
+  },
+  concurrency: {
+    global: parseInt(process.env.SCRAPER_GLOBAL_CONCURRENCY ?? "8", 10),
+    perAdapter: {
+      GREENHOUSE: 8,
+      LEVER: 8,
+      SUCCESSFACTORS: 8,
+      ICIMS: 4,
+      WORKDAY: 3,
+      ORACLE: 3,
+    } as Record<string, number>,
+    jobDetailConcurrency: 5,
+    minRequestIntervalMs: 100,
   },
   archiveAfterDays: 7,
   playwrightTimeout: 30000,

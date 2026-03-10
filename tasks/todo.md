@@ -1,164 +1,183 @@
-# Job Seeker — Implementation Tracker
+# PRD-17: Scraper Performance Optimization — Implementation Plan
 
-## New ATS Adapters: Oracle HCM Cloud + SAP SuccessFactors
+## Phase 1: Bulk DB Upserts + Adapter Interface
 
-### Overview
+**Goal:** Replace per-job upsert with batch SQL. Expand adapter interface. Add `contentHash` column.
 
-Add two new ATS platform adapters following the existing pattern. Both are batch scrapers (like iCIMS/Greenhouse) — no streaming needed.
+### Steps
 
-**Touchpoints for each adapter** (6 files):
-1. `scraper/src/adapters/<platform>.ts` — Full adapter class
-2. `scraper/src/adapters/registry.ts` — Register in adapter map
-3. `src/lib/scraper/adapters.ts` — Lightweight Next.js port
-4. `src/lib/scraper/scrape-company.ts` — Add to `batchScrapers` map
-5. `prisma/schema.prisma` — Add to `AtsPlatform` enum
-6. `src/lib/validations/scraper.ts` — Add to `atsPlatformValues`
+- [x] **1.1** Install `@paralleldrive/cuid2` in `scraper/package.json`, run `npm install`
+- [x] **1.2** Add `contentHash String?` to `ScrapedJob` in `prisma/schema.prisma` (after `jobDescriptionMd`). Run `npx prisma migrate dev --name add-content-hash` and `npx prisma generate`
+- [x] **1.3** Expand `scraper/src/adapters/types.ts`:
+  - Add `ExistingJobRecord` interface (`externalJobId`, `title`, `contentHash`)
+  - Expand `AtsAdapter.listJobs` to accept full company record (incl. `lastScrapeAt`) + optional `existingJobs?: Map<string, ExistingJobRecord>`
+- [x] **1.4** Update all 6 adapter `listJobs` signatures to match new interface (signature-only, no logic changes): `greenhouse.ts`, `lever.ts`, `workday.ts`, `oracle.ts`, `icims.ts`, `successfactors.ts`
+- [x] **1.5** Rewrite `scraper/src/services/job-store.ts` (full rewrite):
+  - Import `createId` from `@paralleldrive/cuid2`, `createHash` from `node:crypto`
+  - Add `computeContentHash(html)` helper (SHA-256 hex digest)
+  - Add `skipped` to `UpsertResult`
+  - Accept `existingJobs` map as third parameter to `upsertJobs()`
+  - Chunk jobs into batches of 50
+  - Build parameterized `INSERT ... ON CONFLICT DO UPDATE` SQL per batch
+  - Use `$N::jsonb` casting for `locations`, `JSON.stringify()` for param value
+  - Use `COALESCE(NULLIF(EXCLUDED.job_description_md, ''), scraped_jobs.job_description_md)` for markdown preservation
+  - Use `COALESCE(EXCLUDED.salary_min, scraped_jobs.salary_min)` for salary fields (prevents Phase 6 nullification)
+  - Pre-generate IDs via `createId()` for new rows
+  - `firstSeenAt` only in INSERT, not in ON CONFLICT UPDATE
+  - Detect re-opened jobs via CTE with RETURNING (no extra query)
+  - Removal detection: single `UPDATE ... WHERE external_job_id NOT IN (unnest($2::text[]))` per company
+  - Error handling: on batch failure, retry with batch size 1 to isolate bad row
+  - **Table name:** use `scraped_jobs` not `ScrapedJob` in raw SQL
+- [x] **1.6** Update `scraper/src/services/scrape-runner.ts`:
+  - Pre-load existing jobs: `prisma.scrapedJob.findMany({ where: { companyId, removedAt: null }, select: { externalJobId, title, contentHash } })`
+  - Build `existingJobs` map, pass to `adapter.listJobs()` and `upsertJobs()`
+  - **FR-14:** Capture `scrapeStartTime = new Date()` before adapter call. Persist as `lastScrapeAt` only on success.
+  - Pass full company object (with `lastScrapeAt`, `atsPlatform`) to adapter
+- [x] **1.7** Verify `index.ts` passes full company record (Prisma `findMany` already returns it — just ensure `scrapeCompany` type accepts it)
 
-Then one migration + `prisma generate`.
-
----
-
-### Adapter 1: Oracle HCM Cloud (ORACLE)
-
-**API:** `GET /hcmRestApi/resources/11.13.18.05/recruitingICEJobRequisitions`
-- Public JSON REST endpoint (same API the career site SPA calls)
-- Pagination via `limit` + `offset`, response includes `hasMore` + `totalResults`
-- Supports `finder=findReqs` with params: `keyword`, `workLocationCountryCode`, `workplaceType`, etc.
-
-**Base URL format:** `https://{instance}.fa.{region}.oraclecloud.com/hcmUI/CandidateExperience/en/sites/{siteId}`
-- Example: `https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/jobsearch`
-- Need to parse: instance host + siteId from the URL
-
-**API URL construction:**
-- List: `https://{host}/hcmRestApi/resources/11.13.18.05/recruitingICEJobRequisitions?finder=findReqs;siteNumber={siteId};workLocationCountryCode=US&limit=25&offset=0`
-- The `siteNumber` parameter links to the career site's siteId
-
-**Field mapping to ScrapedJobData:**
-| Oracle field | → | ScrapedJobData field |
-|---|---|---|
-| `RequisitionId` | → | `externalJobId` |
-| `Title` | → | `title` |
-| Constructed URL | → | `url` |
-| `Organization` or `Department` or `JobFamily` | → | `department` |
-| `PrimaryLocation` + `secondaryLocations` | → | `locations` |
-| `WorkplaceType` | → | `locationType` (Remote/Hybrid/null) |
-| Description HTML | → | `jobDescriptionHtml` |
-| `PostedDate` | → | `postedAt` |
-| `PostingEndDate` | → | `postingEndDate` |
-| Salary (extract from description if present) | → | `salaryMin`/`salaryMax` |
-
-**Implementation steps:**
-
-- [x] **1a.** Create `scraper/src/adapters/oracle.ts`
-  - `parseOracleUrl(baseUrl)` — extract host + siteId from career site URL
-  - Define response types (`OracleJobRequisition`, `OracleListResponse`)
-  - `OracleAdapter` class implementing `AtsAdapter`
-  - Paginate with `limit=25`, `offset+=25`, stop when `!hasMore`
-  - Filter: US via `workLocationCountryCode=US` query param (server-side)
-  - Salary: reuse `extractSalaryFromHtml()` pattern (Oracle rarely has structured salary)
-  - Location type: map `WorkplaceType` field directly (values like "Remote", "Hybrid", "On-Site")
-  - 500ms delay between pages
-
-- [x] **1b.** Create lightweight Next.js port in `src/lib/scraper/adapters.ts`
-  - Add `scrapeOracle()` function matching the pattern of `scrapeGreenhouse()`/`scrapeICIMS()`
-  - Same logic, inline (no scraper package imports)
-
-- [x] **1c.** Wire up
-  - Add `ORACLE` to `AtsPlatform` enum in `prisma/schema.prisma`
-  - Add `"ORACLE"` to `atsPlatformValues` in `src/lib/validations/scraper.ts`
-  - Register `OracleAdapter` in `scraper/src/adapters/registry.ts`
-  - Add `ORACLE: scrapeOracle` to `batchScrapers` in `src/lib/scraper/scrape-company.ts`
-
-- [x] **1d.** Validate against a live Oracle HCM site
-  - Pick a known Oracle HCM company (e.g. Oracle itself, JPMorgan Chase)
-  - Verify the API endpoint returns data
-  - Confirm field mapping is correct
+### Verify before Phase 2
+- [x] Migration succeeds, `contentHash` column exists
+- [x] `npx tsc --noEmit` passes
+- [ ] Test scrape one company: same jobs inserted, `content_hash` populated
+- [ ] Removal detection works (manually remove a job, re-scrape)
+- [ ] Re-opened detection works (set `removed_at`, re-scrape, confirm cleared + logged)
+- [ ] `first_seen_at` preserved for existing rows
 
 ---
 
-### Adapter 2: SAP SuccessFactors (SUCCESSFACTORS)
+## Phase 2: Content Hash Skip
 
-**API:** XML job feed — `https://{host}/career?company={companyId}&career_ns=job_listing_summary&resultType=XML`
-- Public, no auth required
-- Returns all jobs in a single response (no pagination needed — like Lever)
-- XML format (need to parse XML)
+**Goal:** Skip `htmlToMarkdown()` when content hash is unchanged.
 
-**Base URL format:** `https://career{N}.successfactors.{tld}/career?company={companyId}`
-- Example: `https://career2.successfactors.eu/career?company=esa`
-- Need to parse: host + companyId from the URL
+### Steps
 
-**XML parsing:**
-- Use built-in DOMParser or a lightweight XML parser
-- The scraper package can use `fast-xml-parser` (lightweight, no native deps)
-- The Next.js port can use the same package (it's pure JS)
+- [ ] **2.1** In `job-store.ts` batch loop, before `htmlToMarkdown()`:
+  - Compute `newHash = computeContentHash(job.jobDescriptionHtml)`
+  - Look up job in `existingJobs` map by `externalJobId`
+  - If found AND `existing.contentHash === newHash`: set `jobDescriptionMd = ""`, increment `skipped` (SQL COALESCE preserves existing)
+  - If not found OR hash differs/null: call `htmlToMarkdown()`, include new hash
+- [ ] **2.2** Add `skipped: result.skipped` to scrape-runner log output
 
-**Field mapping to ScrapedJobData:**
-| SAP field | → | ScrapedJobData field |
-|---|---|---|
-| Job req ID | → | `externalJobId` |
-| Job title | → | `title` |
-| Constructed detail URL | → | `url` |
-| Department/Category | → | `department` |
-| Location | → | `locations` (filter to US via `isUSLocation()`) |
-| Location text | → | `locationType` (infer Remote/Hybrid) |
-| Description | → | `jobDescriptionHtml` |
-| Posted date | → | `postedAt` |
-| N/A | → | `postingEndDate` (null) |
-| Salary (extract from description) | → | `salaryMin`/`salaryMax` |
-
-**Implementation steps:**
-
-- [x] **2a.** Add `fast-xml-parser` dependency to `scraper/` package + root package
-  - Lightweight (no native deps), works in both Node.js and edge runtimes
-
-- [x] **2b.** Create `scraper/src/adapters/successfactors.ts`
-  - `parseSuccessFactorsUrl(baseUrl)` — extract host + companyId
-  - Fetch XML feed URL
-  - Parse XML with `fast-xml-parser`
-  - Define response type for the XML structure
-  - `SuccessFactorsAdapter` class implementing `AtsAdapter`
-  - Single request (no pagination) — like Lever
-  - Filter: US via `isUSLocation()` (no server-side country filter)
-  - Salary: reuse `extractSalaryFromHtml()` pattern
-  - Location type: infer from location text
-
-- [x] **2c.** Create lightweight Next.js port in `src/lib/scraper/adapters.ts`
-  - Add `scrapeSuccessFactors()` function
-  - Same logic, inline
-
-- [x] **2d.** Wire up
-  - Add `SUCCESSFACTORS` to `AtsPlatform` enum in `prisma/schema.prisma`
-  - Add `"SUCCESSFACTORS"` to `atsPlatformValues` in `src/lib/validations/scraper.ts`
-  - Register `SuccessFactorsAdapter` in `scraper/src/adapters/registry.ts`
-  - Add `SUCCESSFACTORS: scrapeSuccessFactors` to `batchScrapers` in `src/lib/scraper/scrape-company.ts`
-
-- [x] **2e.** Validate against a live SuccessFactors site
-  - Pick a known SF company
-  - Verify the XML feed returns data and the structure matches expectations
-  - Confirm field mapping + US location filtering works
+### Verify before Phase 3
+- [ ] Scrape a company, then immediately scrape again
+- [ ] Second run shows >90% `skipped` in logs
+- [ ] Second run is measurably faster
+- [ ] `job_description_md` is NOT overwritten with empty string on skipped jobs (check DB)
+- [ ] Changed HTML gets markdown re-generated and new hash stored
 
 ---
 
-### Shared steps
+## Phase 3: Company-Level Concurrency
 
-- [ ] **3a.** (pending) Run Prisma migration: `npx prisma migrate dev --name add-oracle-successfactors-platforms`
-- [x] **3b.** Run `npx prisma generate`
-- [x] **3c.** Run `npx tsc --noEmit` — verify 0 errors
-- [x] **3d.** Run `npx vitest run` — verify all tests pass
-- [ ] **3e.** (pending) Run `npm run build` — verify build succeeds
+**Goal:** Replace sequential loop with `p-limit` pool + nested per-adapter semaphores.
+
+### Steps
+
+- [x] **3.1** Install `p-limit` (v6+, ESM-only — works with `tsx`) in `scraper/package.json`
+- [x] **3.2** Update `scraper/src/config.ts`:
+  - Kept `delays.betweenRequests` and `delays.betweenPages` (adapters still reference them; Phase 4 removes)
+  - Keep `delays.rateLimitWait` (60000)
+  - Add `concurrency` block: `global: 8`, `perAdapter` map, `jobDetailConcurrency: 5`, `minRequestIntervalMs: 100`
+  - Support env var overrides: `parseInt(process.env.SCRAPER_GLOBAL_CONCURRENCY ?? "8")`
+- [x] **3.3** Create `scraper/src/utils/concurrency.ts`:
+  - `createConcurrencyLimiters()`: returns `globalLimit` (p-limit) + `adapterLimits` (record of p-limit per platform)
+  - `HostRateLimiter` class (singleton): per-host async mutex with promise-chain serialization, enforces `minRequestIntervalMs` gap between requests to same hostname
+  - Used dynamic `import("p-limit")` to handle ESM-only module in CJS/Node16 context
+- [x] **3.4** Rewrite main loop in `scraper/src/index.ts`:
+  - Replace `for` loop with `Promise.allSettled(companies.map(c => globalLimit(() => adapterLimit(() => scrapeCompany(c)))))`
+  - Nested semaphore: acquire global slot, then per-adapter slot
+  - Add FR-11 summary logging (wall time, success/failure counts)
+- [x] **3.5** Do NOT remove `delay()` calls from adapters yet (Phase 4 replaces them with host rate limiter)
+
+### Verify before Phase 4
+- [ ] Full scrape with 8+ companies: logs show concurrent processing
+- [ ] Wall time drops proportionally to concurrency
+- [ ] No 429 errors
+- [ ] No new failures vs sequential baseline
+- [ ] Monitor memory usage
 
 ---
 
-### Key decisions
+## Phase 4: Job-Detail Concurrency + Host Rate Limiter
 
-1. **No streaming** — Both adapters use batch fetch (Oracle paginates, SAP returns all at once). Neither needs the Workday-style `onJob` callback. They go in the `batchScrapers` map.
+**Goal:** Parallelize Workday/Oracle detail fetches. Replace fixed delays with host-level rate limiter.
 
-2. **XML parser choice** — `fast-xml-parser` is pure JS, zero native deps, works in Next.js edge runtime. Single dependency for SAP adapter.
+### Steps
 
-3. **Oracle API version** — Using `11.13.18.05` (the ICE endpoint version documented by Oracle). This is stable — it's what their own career sites use.
+- [x] **4.1** Workday adapter (`scraper/src/adapters/workday.ts`):
+  - Import `hostRateLimiter` from `../utils/concurrency.js` and `pLimit`
+  - Remove all `await delay(config.delays.betweenRequests)` calls
+  - Add `await hostRateLimiter.acquire(host)` before every `fetch()` call
+  - Replace sequential detail-fetch loop with `pLimit(config.concurrency.jobDetailConcurrency)` pool
+  - Each detail task returns `ScrapedJobData | null`; filter nulls after `Promise.allSettled`
+  - Pagination loop stays sequential (page by page); detail fetches within each page are concurrent
+- [x] **4.2** Oracle adapter (`scraper/src/adapters/oracle.ts`): same pattern as Workday
+  - Filter US + full-time from list FIRST, then parallelize detail fetches for eligible jobs only
+- [x] **4.3** iCIMS adapter (`scraper/src/adapters/icims.ts`): replace `delay()` with `hostRateLimiter.acquire()`
+- [x] **4.4** Remove dead delay config values from `config.ts` (`betweenRequests`, `betweenPages`)
 
-4. **Enum naming** — `ORACLE` (not `ORACLE_HCM` — keep it short like the others). `SUCCESSFACTORS` (not `SAP` — too generic, and the platform name is SuccessFactors).
+### Verify before Phase 5
+- [ ] Large Workday company (100+ jobs): detail fetches run 5 concurrently
+- [ ] Detail phase ~5x faster than sequential
+- [ ] No 429 errors from Workday or Oracle
+- [ ] Two companies on same Workday tenant share rate limiting
+- [ ] Full scrape: no regressions
 
-5. **No detail endpoint needed for Oracle** — The list endpoint returns rich data (title, locations, description, dates). Unlike Workday, we don't need per-job detail requests, which makes this adapter fast.
+---
 
-6. **SAP detail page** — The XML feed may not include full job descriptions. If it only has summaries, we'll need to fetch individual detail pages. Determine during validation (step 2e). If needed, add sequential detail fetches with 500ms delay (like Workday).
+## Phase 5: Greenhouse Incremental Fetching
+
+**Goal:** Use `updated_after` to only fetch changed Greenhouse jobs. Maintain removal detection.
+
+### Steps
+
+- [x] **5.1** Update Greenhouse adapter (`scraper/src/adapters/greenhouse.ts`):
+  - If `company.lastScrapeAt` exists, append `&updated_after={ISO8601}` to URL
+  - **Implementation risk:** Boards API may not support `updated_after`. If API returns error, catch and fallback to full fetch without parameter
+  - For removal detection with incremental mode: also fetch lightweight ID-only list (`/jobs` without `?content=true`)
+  - For unchanged jobs (in ID list but not in incremental response): create lightweight `ScrapedJobData` entries with empty `jobDescriptionHtml` (hash-skip preserves existing markdown)
+  - This ensures `seenExternalIds` in job-store gets the full list for removal detection
+  - Added detection for API ignoring `updated_after` (returns same count as full list) → falls back to full fetch
+- [ ] **5.2** Test `updated_after` against real Greenhouse Boards API
+
+### Verify before Phase 6
+- [ ] If `updated_after` works: second scrape returns fewer jobs, non-updated jobs filled from ID list
+- [ ] If it doesn't work: fallback to full fetch is seamless
+- [ ] Removal detection still marks removed jobs correctly
+- [ ] No jobs lost between incremental runs
+
+---
+
+## Phase 6: Conditional Detail Skip (Workday/Oracle)
+
+**Goal:** Skip detail page fetches when title matches and content hash exists.
+
+### Steps
+
+- [x] **6.1** Workday adapter: inside detail-fetch pool (from Phase 4), before fetching:
+  - Look up job in `existingJobs` map (try `externalPath` as key)
+  - If found AND `existing.contentHash` non-null AND `existing.title === posting.title`: return lightweight `ScrapedJobData` with empty `jobDescriptionHtml`
+  - **Gotcha:** Workday `externalJobId` may be `jobReqId` (from detail page), not `externalPath` (from listing). On first scrape, all details are fetched. On subsequent scrapes, try matching by `externalPath` — if not found, fetch detail as normal.
+- [x] **6.2** Oracle adapter: same pattern but simpler — `req.Id` is available at list time and matches stored `externalJobId`
+  - Look up `existingJobs.get(req.Id)`, compare title, skip if hash exists
+- [x] **6.3** Verify salary fields preserved on skipped jobs (COALESCE in Phase 1 SQL handles this)
+- [x] **6.4** Add detail-skip counting to adapter logs
+
+### Final Verification
+- [ ] Scrape large Workday company twice: detail fetch count drops >70% on second run
+- [ ] Skipped jobs retain `jobDescriptionMd` and salary fields
+- [ ] `lastSeenAt` still updated for skipped jobs
+- [ ] Same tests for Oracle
+- [ ] Full end-to-end: 200+ companies < 60 min wall time
+- [ ] Second run within the hour: < 30 min (incremental)
+
+---
+
+## Cross-Phase Gotchas
+
+1. **Raw SQL table names:** Use `scraped_jobs` not `ScrapedJob` (Prisma `@@map`)
+2. **`p-limit` v6+ is ESM-only:** Works with `tsx` but verify at install
+3. **COALESCE for salary fields:** Must be in Phase 1 SQL to prevent Phase 6 nullification
+4. **Host rate limiter must use promise-chain mutex:** Simple timestamp has race condition with concurrent callers
+5. **Greenhouse `updated_after` may not work on Boards API:** Content-hash skip (Phase 2) provides most savings as fallback
+6. **Workday `externalJobId` mismatch:** `externalPath` (listing) vs `jobReqId` (detail) — test with real data

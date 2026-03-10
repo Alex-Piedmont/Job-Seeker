@@ -1,6 +1,6 @@
-import type { AtsAdapter, ScrapedJobData } from "./types.js";
+import type { AtsAdapter, ScrapedJobData, ExistingJobRecord } from "./types.js";
 import { config } from "../config.js";
-import { delay } from "../utils/delay.js";
+import { hostRateLimiter } from "../utils/concurrency.js";
 import { logger } from "../utils/logger.js";
 
 // ---------------------------------------------------------------------------
@@ -71,15 +71,20 @@ function inferLocationType(text: string): string | null {
 // ---------------------------------------------------------------------------
 
 export class ICIMSAdapter implements AtsAdapter {
-  async listJobs(company: { id: string; name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
+  async listJobs(
+    company: { id: string; name: string; baseUrl: string; atsPlatform: string; lastScrapeAt: Date | null },
+    _existingJobs?: Map<string, ExistingJobRecord>,
+  ): Promise<ScrapedJobData[]> {
     // baseUrl should be the Jibe-powered job site, e.g. https://jobs.statefarm.com
     const base = company.baseUrl.replace(/\/+$/, "");
+    const hostname = new URL(base).host;
     const jobs: ScrapedJobData[] = [];
     let page = 1;
 
     logger.info("Starting iCIMS/Jibe scrape", { company: company.name, baseUrl: base });
 
     while (true) {
+      await hostRateLimiter.acquire(hostname);
       const url = `${base}/api/jobs?page=${page}`;
       const res = await fetch(url, {
         headers: { "User-Agent": config.userAgent },
@@ -144,7 +149,6 @@ export class ICIMSAdapter implements AtsAdapter {
       }
 
       page++;
-      await delay(config.delays.betweenRequests);
     }
 
     logger.info("iCIMS/Jibe scrape complete", { company: company.name, jobCount: jobs.length });

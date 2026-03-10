@@ -13,10 +13,21 @@ export interface ScrapedJobData {
   postingEndDate: string | null;  // ISO date string when listing expires
 }
 
+export interface ExistingJobRecord {
+  externalJobId: string;
+  title: string;
+  contentHash: string | null;
+}
+
 export interface AtsAdapter {
-  listJobs(company: {
-    id: string;
-    name: string;
-    baseUrl: string;
-  }): Promise<ScrapedJobData[]>;
+  listJobs(
+    company: {
+      id: string;
+      name: string;
+      baseUrl: string;
+      atsPlatform: string;
+      lastScrapeAt: Date | null;
+    },
+    existingJobs?: Map<string, ExistingJobRecord>,
+  ): Promise<ScrapedJobData[]>;
 }

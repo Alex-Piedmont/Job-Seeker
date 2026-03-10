@@ -2,6 +2,8 @@ import { prisma } from "./prisma.js";
 import { scrapeCompany } from "./services/scrape-runner.js";
 import { autoArchiveStaleJobs } from "./services/archive.js";
 import { logger } from "./utils/logger.js";
+import { config } from "./config.js";
+import { createConcurrencyLimiters } from "./utils/concurrency.js";
 
 const MAX_STARTUP_RETRIES = 5;
 const RETRY_DELAY_MS = 3000;
@@ -35,25 +37,50 @@ async function main(): Promise<void> {
       orderBy: { name: "asc" },
     });
 
-    logger.info("Companies to scrape", { count: companies.length });
+    logger.info("Companies to scrape", {
+      count: companies.length,
+      globalConcurrency: config.concurrency.global,
+    });
 
-    // Scrape each company sequentially
-    for (const company of companies) {
-      try {
-        await scrapeCompany(company);
-      } catch (err) {
-        // scrapeCompany handles its own errors, but catch any unexpected ones
-        logger.error("Unexpected error scraping company", {
-          company: company.name,
-          error: err instanceof Error ? err.message : String(err),
-        });
+    const wallStart = Date.now();
+    const { globalLimit, adapterLimits } = await createConcurrencyLimiters();
+
+    // Scrape companies concurrently with nested semaphores:
+    // each company acquires a global slot, then a per-adapter slot
+    const results = await Promise.allSettled(
+      companies.map((company) =>
+        globalLimit(() => {
+          const adapterLimit =
+            adapterLimits[company.atsPlatform] ?? adapterLimits["GREENHOUSE"]; // fallback to highest concurrency
+          return adapterLimit(() => scrapeCompany(company));
+        })
+      )
+    );
+
+    // FR-11: Summary logging
+    let successCount = 0;
+    let failureCount = 0;
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        successCount++;
+      } else {
+        failureCount++;
       }
     }
 
     // Auto-archive stale jobs
     const archived = await autoArchiveStaleJobs();
+
+    const wallTimeMs = Date.now() - wallStart;
+    const wallTimeSec = (wallTimeMs / 1000).toFixed(1);
+    const wallTimeMin = (wallTimeMs / 60000).toFixed(1);
+
     logger.info("Scraper finished", {
       companiesProcessed: companies.length,
+      succeeded: successCount,
+      failed: failureCount,
+      wallTimeMs,
+      wallTime: wallTimeMs > 60000 ? `${wallTimeMin}m` : `${wallTimeSec}s`,
       autoArchived: archived,
     });
   } finally {

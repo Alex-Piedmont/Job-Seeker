@@ -1,4 +1,4 @@
-import type { AtsAdapter, ScrapedJobData } from "./types.js";
+import type { AtsAdapter, ScrapedJobData, ExistingJobRecord } from "./types.js";
 import { config } from "../config.js";
 import { isUSLocation } from "../utils/location-filter.js";
 import { logger } from "../utils/logger.js";
@@ -32,7 +32,10 @@ function extractSlug(baseUrl: string): string {
 }
 
 export class LeverAdapter implements AtsAdapter {
-  async listJobs(company: { id: string; name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
+  async listJobs(
+    company: { id: string; name: string; baseUrl: string; atsPlatform: string; lastScrapeAt: Date | null },
+    _existingJobs?: Map<string, ExistingJobRecord>,
+  ): Promise<ScrapedJobData[]> {
     const slug = extractSlug(company.baseUrl);
     const url = `https://api.lever.co/v0/postings/${slug}`;
     logger.info("Fetching Lever jobs", { company: company.name, url });

@@ -1,6 +1,6 @@
-import type { AtsAdapter, ScrapedJobData } from "./types.js";
+import type { AtsAdapter, ScrapedJobData, ExistingJobRecord } from "./types.js";
 import { config } from "../config.js";
-import { delay } from "../utils/delay.js";
+import { hostRateLimiter } from "../utils/concurrency.js";
 import { logger } from "../utils/logger.js";
 
 // ---------------------------------------------------------------------------
@@ -89,13 +89,21 @@ interface CxsDetailResponse {
 const US_COUNTRY_FACET_ID = "bc33aa3152ec42d4995f4791a106ed09";
 
 export class WorkdayAdapter implements AtsAdapter {
-  async listJobs(company: { id: string; name: string; baseUrl: string }): Promise<ScrapedJobData[]> {
+  async listJobs(
+    company: { id: string; name: string; baseUrl: string; atsPlatform: string; lastScrapeAt: Date | null },
+    existingJobs?: Map<string, ExistingJobRecord>,
+  ): Promise<ScrapedJobData[]> {
     const { host, tenant, siteId } = parseWorkdayUrl(company.baseUrl);
     const listUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/jobs`;
+
+    // Create concurrency limiter for detail fetches within this company
+    const pLimit = (await import("p-limit")).default;
+    const detailLimit = pLimit(config.concurrency.jobDetailConcurrency);
 
     // Discover facets with an initial probe request
     const appliedFacets: Record<string, string[]> = {};
 
+    await hostRateLimiter.acquire(host);
     const probeRes = await fetch(listUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", "User-Agent": config.userAgent },
@@ -140,17 +148,17 @@ export class WorkdayAdapter implements AtsAdapter {
       }
     }
 
-    await delay(config.delays.betweenRequests);
-
     const jobs: ScrapedJobData[] = [];
     let offset = 0;
     let totalJobs = -1; // capture from first response only
     const limit = 20;
+    let detailSkipped = 0;
 
     logger.info("Starting Workday CXS scrape", { company: company.name, listUrl });
 
     // Paginate list endpoint
     while (true) {
+      await hostRateLimiter.acquire(host);
       const listRes = await fetch(listUrl, {
         method: "POST",
         headers: {
@@ -179,77 +187,109 @@ export class WorkdayAdapter implements AtsAdapter {
         logger.info("Workday total jobs reported", { company: company.name, total: totalJobs });
       }
 
-      // Fetch detail for each job
-      for (const posting of data.jobPostings) {
-        try {
-          await delay(config.delays.betweenRequests);
+      // Fetch details concurrently within each page
+      const detailTasks = data.jobPostings.map((posting) =>
+        detailLimit(async (): Promise<ScrapedJobData | null> => {
+          try {
+            // Phase 6: Conditional detail skip — if title matches and contentHash exists, skip fetch
+            if (existingJobs) {
+              const existing = existingJobs.get(posting.externalPath);
+              if (existing && existing.contentHash && existing.title === posting.title) {
+                detailSkipped++;
+                const path = posting.externalPath.replace(/^\/job\//, "");
+                return {
+                  externalJobId: existing.externalJobId,
+                  title: posting.title,
+                  url: `https://${host}/en-US/${siteId}/job/${path}`,
+                  department: null,
+                  locations: posting.locationsText ? [posting.locationsText] : [],
+                  locationType: posting.locationsText?.toLowerCase().includes("remote") ? "Remote" :
+                    posting.locationsText?.toLowerCase().includes("hybrid") ? "Hybrid" : null,
+                  salaryMin: null,
+                  salaryMax: null,
+                  salaryCurrency: "USD",
+                  jobDescriptionHtml: "",
+                  postedAt: posting.postedOn ?? null,
+                  postingEndDate: null,
+                };
+              }
+            }
 
-          const path = posting.externalPath.replace(/^\/job\//, "");
-          const detailUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/job/${path}`;
-          const detailRes = await fetch(detailUrl, {
-            headers: { "User-Agent": config.userAgent },
-          });
+            await hostRateLimiter.acquire(host);
 
-          if (!detailRes.ok) {
-            logger.warn("Workday detail request failed", {
+            const path = posting.externalPath.replace(/^\/job\//, "");
+            const detailUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/job/${path}`;
+            const detailRes = await fetch(detailUrl, {
+              headers: { "User-Agent": config.userAgent },
+            });
+
+            if (!detailRes.ok) {
+              logger.warn("Workday detail request failed", {
+                company: company.name,
+                externalPath: posting.externalPath,
+                status: detailRes.status,
+              });
+              return null;
+            }
+
+            const detail = (await detailRes.json()) as CxsDetailResponse;
+            const info = detail.jobPostingInfo;
+
+            // Secondary US validation via country object
+            if (info.country && info.country.id !== US_COUNTRY_FACET_ID) {
+              logger.info("Skipping non-US job", { company: company.name, title: info.title, country: info.country.descriptor });
+              return null;
+            }
+
+            const locations = [info.location, ...(info.additionalLocations ?? [])].filter(Boolean);
+            const locationText = locations.join(", ").toLowerCase();
+            const locationType = locationText.includes("remote") ? "Remote" :
+              locationText.includes("hybrid") ? "Hybrid" : null;
+
+            const salary = extractSalaryFromHtml(info.jobDescription ?? "");
+
+            if (salary.isHourly) {
+              logger.info("Skipping hourly role", { company: company.name, title: info.title, salaryMax: salary.max });
+              return null;
+            }
+
+            return {
+              externalJobId: info.jobReqId ?? posting.externalPath,
+              title: info.title ?? posting.title,
+              url: info.externalUrl ?? `https://${host}/en-US/${siteId}/job/${path}`,
+              department: info.jobFamilyGroup ?? null,
+              locations,
+              locationType,
+              salaryMin: salary.min,
+              salaryMax: salary.max,
+              salaryCurrency: "USD",
+              jobDescriptionHtml: info.jobDescription ?? "",
+              postedAt: info.startDate ?? null,
+              postingEndDate: info.endDate ?? null,
+            };
+          } catch (err) {
+            logger.warn("Workday detail fetch error", {
               company: company.name,
               externalPath: posting.externalPath,
-              status: detailRes.status,
+              error: err instanceof Error ? err.message : String(err),
             });
-            continue;
+            return null;
           }
+        }),
+      );
 
-          const detail = (await detailRes.json()) as CxsDetailResponse;
-          const info = detail.jobPostingInfo;
-
-          // Secondary US validation via country object
-          if (info.country && info.country.id !== US_COUNTRY_FACET_ID) {
-            logger.info("Skipping non-US job", { company: company.name, title: info.title, country: info.country.descriptor });
-            continue;
-          }
-
-          const locations = [info.location, ...(info.additionalLocations ?? [])].filter(Boolean);
-          const locationText = locations.join(", ").toLowerCase();
-          const locationType = locationText.includes("remote") ? "Remote" :
-            locationText.includes("hybrid") ? "Hybrid" : null;
-
-          const salary = extractSalaryFromHtml(info.jobDescription ?? "");
-
-          if (salary.isHourly) {
-            logger.info("Skipping hourly role", { company: company.name, title: info.title, salaryMax: salary.max });
-            continue;
-          }
-
-          jobs.push({
-            externalJobId: info.jobReqId ?? posting.externalPath,
-            title: info.title ?? posting.title,
-            url: info.externalUrl ?? `https://${host}/en-US/${siteId}/job/${path}`,
-            department: info.jobFamilyGroup ?? null,
-            locations,
-            locationType,
-            salaryMin: salary.min,
-            salaryMax: salary.max,
-            salaryCurrency: "USD",
-            jobDescriptionHtml: info.jobDescription ?? "",
-            postedAt: info.startDate ?? null,
-            postingEndDate: info.endDate ?? null,
-          });
-        } catch (err) {
-          logger.warn("Workday detail fetch error", {
-            company: company.name,
-            externalPath: posting.externalPath,
-            error: err instanceof Error ? err.message : String(err),
-          });
+      const results = await Promise.allSettled(detailTasks);
+      for (const result of results) {
+        if (result.status === "fulfilled" && result.value) {
+          jobs.push(result.value);
         }
       }
 
       offset += data.jobPostings.length;
       if (offset >= totalJobs) break;
-
-      await delay(config.delays.betweenRequests);
     }
 
-    logger.info("Workday CXS scrape complete", { company: company.name, jobCount: jobs.length });
+    logger.info("Workday CXS scrape complete", { company: company.name, jobCount: jobs.length, detailSkipped });
     return jobs;
   }
 }
