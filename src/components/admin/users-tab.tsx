@@ -185,64 +185,70 @@ export function UsersTab() {
                   const isExpanded = expandedId === user.id;
 
                   return (
-                    <tr key={user.id} className="group">
-                      <td colSpan={COLUMNS.length + 1} className="p-0">
-                        <button
-                          className="flex w-full items-center border-b text-left hover:bg-muted/30"
-                          onClick={() =>
-                            setExpandedId(isExpanded ? null : user.id)
-                          }
+                    <tr
+                      key={user.id}
+                      className="group border-b cursor-pointer hover:bg-muted/30"
+                      onClick={() =>
+                        setExpandedId(isExpanded ? null : user.id)
+                      }
+                    >
+                      <td className="px-3 py-2.5">
+                        <span className="font-medium truncate block">
+                          {user.name}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 hidden md:table-cell text-muted-foreground truncate max-w-[200px]">
+                        {user.email}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        {isAdmin
+                          ? "Unlimited"
+                          : `${user.applicationCount}/${user.applicationCap}`}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        {isAdmin
+                          ? "Unlimited"
+                          : `${user.resumeGenerationsUsedThisMonth}/${user.resumeGenerationCap}`}
+                      </td>
+                      <td className="px-3 py-2.5 hidden lg:table-cell whitespace-nowrap">
+                        Est. ${user.estimatedTotalCost.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2.5 hidden lg:table-cell whitespace-nowrap text-muted-foreground">
+                        {formatDate(user.lastActiveAt)}
+                      </td>
+                      <td className="px-3 py-2.5 hidden md:table-cell">
+                        <Badge
+                          variant={isAdmin ? "default" : "secondary"}
+                          className="text-xs"
                         >
-                          <span className="px-3 py-2.5 flex-1 min-w-0">
-                            <span className="font-medium truncate block">
-                              {user.name}
-                            </span>
-                          </span>
-                          <span className="px-3 py-2.5 hidden md:block text-muted-foreground truncate max-w-[200px]">
-                            {user.email}
-                          </span>
-                          <span className="px-3 py-2.5 whitespace-nowrap">
-                            {isAdmin
-                              ? "Unlimited"
-                              : `${user.applicationCount}/${user.applicationCap}`}
-                          </span>
-                          <span className="px-3 py-2.5 whitespace-nowrap">
-                            {isAdmin
-                              ? "Unlimited"
-                              : `${user.resumeGenerationsUsedThisMonth}/${user.resumeGenerationCap}`}
-                          </span>
-                          <span className="px-3 py-2.5 hidden lg:block whitespace-nowrap">
-                            Est. ${user.estimatedTotalCost.toFixed(2)}
-                          </span>
-                          <span className="px-3 py-2.5 hidden lg:block whitespace-nowrap text-muted-foreground">
-                            {formatDate(user.lastActiveAt)}
-                          </span>
-                          <span className="px-3 py-2.5 hidden md:block">
-                            <Badge
-                              variant={isAdmin ? "default" : "secondary"}
-                              className="text-xs"
-                            >
-                              {user.role}
-                            </Badge>
-                          </span>
-                        </button>
-                        {isExpanded && !isAdmin && (
-                          <UserLimitEditor
-                            userId={user.id}
-                            userName={user.name}
-                            applicationCap={user.applicationCap}
-                            applicationCount={user.applicationCount}
-                            resumeGenerationCap={user.resumeGenerationCap}
-                            resumeGenerationsUsedThisMonth={
-                              user.resumeGenerationsUsedThisMonth
-                            }
-                            onSaved={() => {
-                              setExpandedId(null);
-                              fetchUsers(pagination.page);
-                            }}
-                            onCancel={() => setExpandedId(null)}
-                          />
-                        )}
+                          {user.role}
+                        </Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {users.map((user) => {
+                  const isAdmin = user.role === "ADMIN";
+                  const isExpanded = expandedId === user.id;
+                  if (!isExpanded || isAdmin) return null;
+                  return (
+                    <tr key={`${user.id}-expand`}>
+                      <td colSpan={COLUMNS.length + 1} className="p-0">
+                        <UserLimitEditor
+                          userId={user.id}
+                          userName={user.name}
+                          applicationCap={user.applicationCap}
+                          applicationCount={user.applicationCount}
+                          resumeGenerationCap={user.resumeGenerationCap}
+                          resumeGenerationsUsedThisMonth={
+                            user.resumeGenerationsUsedThisMonth
+                          }
+                          onSaved={() => {
+                            setExpandedId(null);
+                            fetchUsers(pagination.page);
+                          }}
+                          onCancel={() => setExpandedId(null)}
+                        />
                       </td>
                     </tr>
                   );
