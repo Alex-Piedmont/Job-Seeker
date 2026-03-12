@@ -1,6 +1,7 @@
 import type { AtsAdapter, ScrapedJobData, ExistingJobRecord } from "./types.js";
 import { config } from "../config.js";
 import { hostRateLimiter } from "../utils/concurrency.js";
+import { fetchWithRetry } from "../utils/fetch-retry.js";
 import { logger } from "../utils/logger.js";
 
 // ---------------------------------------------------------------------------
@@ -29,8 +30,8 @@ function extractSalaryFromHtml(html: string): { min: number | null; max: number 
   // Common patterns: "Pay Range: $80,000 - $120,000", "$80,000.00 to $120,000.00"
   const match = html.match(/\$\s*([\d,]+(?:\.\d+)?)\s*(?:[-–—]|to)\s*\$\s*([\d,]+(?:\.\d+)?)/i);
   if (!match) return { min: null, max: null, isHourly: false };
-  const min = parseFloat(match[1].replace(/,/g, ""));
-  const max = parseFloat(match[2].replace(/,/g, ""));
+  const min = Math.round(parseFloat(match[1].replace(/,/g, "")));
+  const max = Math.round(parseFloat(match[2].replace(/,/g, "")));
   if (isNaN(min) || isNaN(max)) return { min: null, max: null, isHourly: false };
   // Values under threshold are hourly rates (e.g. $20.82 - $37.45)
   const isHourly = max < HOURLY_RATE_THRESHOLD;
@@ -104,7 +105,7 @@ export class WorkdayAdapter implements AtsAdapter {
     const appliedFacets: Record<string, string[]> = {};
 
     await hostRateLimiter.acquire(host);
-    const probeRes = await fetch(listUrl, {
+    const probeRes = await fetchWithRetry(listUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", "User-Agent": config.userAgent },
       body: JSON.stringify({ appliedFacets: {}, limit: 1, offset: 0, searchText: "" }),
@@ -159,7 +160,7 @@ export class WorkdayAdapter implements AtsAdapter {
     // Paginate list endpoint
     while (true) {
       await hostRateLimiter.acquire(host);
-      const listRes = await fetch(listUrl, {
+      const listRes = await fetchWithRetry(listUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -190,6 +191,14 @@ export class WorkdayAdapter implements AtsAdapter {
       // Fetch details concurrently within each page
       const detailTasks = data.jobPostings.map((posting) =>
         detailLimit(async (): Promise<ScrapedJobData | null> => {
+          if (!posting.externalPath) {
+            logger.warn("Workday posting missing externalPath, skipping", {
+              company: company.name,
+              title: posting.title,
+            });
+            return null;
+          }
+
           try {
             // Phase 6: Conditional detail skip — if title matches and contentHash exists, skip fetch
             if (existingJobs) {
@@ -219,7 +228,7 @@ export class WorkdayAdapter implements AtsAdapter {
 
             const path = posting.externalPath.replace(/^\/job\//, "");
             const detailUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/job/${path}`;
-            const detailRes = await fetch(detailUrl, {
+            const detailRes = await fetchWithRetry(detailUrl, {
               headers: { "User-Agent": config.userAgent },
             });
 

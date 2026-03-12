@@ -76,8 +76,8 @@ const HOURLY_RATE_THRESHOLD = 1000;
 function extractSalaryFromHtml(html: string): { min: number | null; max: number | null; isHourly: boolean } {
   const match = html.match(/\$\s*([\d,]+(?:\.\d+)?)\s*(?:[-–—]|to)\s*\$\s*([\d,]+(?:\.\d+)?)/i);
   if (!match) return { min: null, max: null, isHourly: false };
-  const min = parseFloat(match[1].replace(/,/g, ""));
-  const max = parseFloat(match[2].replace(/,/g, ""));
+  const min = Math.round(parseFloat(match[1].replace(/,/g, "")));
+  const max = Math.round(parseFloat(match[2].replace(/,/g, "")));
   if (isNaN(min) || isNaN(max)) return { min: null, max: null, isHourly: false };
   const isHourly = max < HOURLY_RATE_THRESHOLD;
   return { min, max, isHourly };
