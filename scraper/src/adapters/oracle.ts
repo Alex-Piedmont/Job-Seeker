@@ -120,7 +120,7 @@ export class OracleAdapter implements AtsAdapter {
 
     // Paginate list endpoint
     while (true) {
-      const listUrl = `${apiBase}/recruitingCEJobRequisitions?finder=findReqs;siteNumber=${siteNumber},limit=${PAGE_SIZE},offset=${offset},sortBy=POSTING_DATES_DESC&onlyData=true&expand=requisitionList`;
+      const listUrl = `${apiBase}/recruitingCEJobRequisitions?finder=findReqs;siteNumber=${siteNumber},workLocationCountryCode=US,limit=${PAGE_SIZE},offset=${offset},sortBy=POSTING_DATES_DESC&onlyData=true&expand=requisitionList`;
 
       await hostRateLimiter.acquire(host);
       const res = await fetch(listUrl, {

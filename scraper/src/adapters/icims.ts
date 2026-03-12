@@ -85,7 +85,7 @@ export class ICIMSAdapter implements AtsAdapter {
 
     while (true) {
       await hostRateLimiter.acquire(hostname);
-      const url = `${base}/api/jobs?page=${page}`;
+      const url = `${base}/api/jobs?page=${page}&location=United+States&limit=100`;
       const res = await fetch(url, {
         headers: { "User-Agent": config.userAgent },
       });
