@@ -1,6 +1,7 @@
 import type { AtsAdapter, ScrapedJobData, ExistingJobRecord } from "./types.js";
 import { config } from "../config.js";
 import { hostRateLimiter } from "../utils/concurrency.js";
+import { fetchWithRetry } from "../utils/fetch-retry.js";
 import { isUSLocation } from "../utils/location-filter.js";
 import { logger } from "../utils/logger.js";
 
@@ -126,7 +127,7 @@ export class SmartRecruitersAdapter implements AtsAdapter {
       const listUrl = `${apiBase}/postings?limit=${PAGE_SIZE}&offset=${offset}&country=US`;
 
       await hostRateLimiter.acquire(API_HOST);
-      const res = await fetch(listUrl, {
+      const res = await fetchWithRetry(listUrl, {
         headers: { "User-Agent": config.userAgent },
       });
 
@@ -176,7 +177,7 @@ export class SmartRecruitersAdapter implements AtsAdapter {
             await hostRateLimiter.acquire(API_HOST);
 
             const detailUrl = `${apiBase}/postings/${posting.id}`;
-            const detailRes = await fetch(detailUrl, {
+            const detailRes = await fetchWithRetry(detailUrl, {
               headers: { "User-Agent": config.userAgent },
             });
 

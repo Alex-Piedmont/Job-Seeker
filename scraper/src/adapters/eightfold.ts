@@ -1,6 +1,7 @@
 import type { AtsAdapter, ScrapedJobData, ExistingJobRecord } from "./types.js";
 import { config } from "../config.js";
 import { hostRateLimiter } from "../utils/concurrency.js";
+import { fetchWithRetry } from "../utils/fetch-retry.js";
 import { isUSLocation } from "../utils/location-filter.js";
 import { delay } from "../utils/delay.js";
 import { logger } from "../utils/logger.js";
@@ -55,7 +56,6 @@ interface PCSXDetailData {
   postedTs?: number;
   workLocationOption?: string;
   efcustomTextPayRangenonretail?: string;
-  [key: string]: unknown;
 }
 
 interface PCSXDetailResponse {
@@ -117,29 +117,6 @@ const variantCache = new Map<string, EightfoldVariant>();
 async function acquireSlot(host: string): Promise<void> {
   await hostRateLimiter.acquire(host);
   await delay(EIGHTFOLD_REQUEST_DELAY_MS);
-}
-
-/** Fetch with retry on 429/503 — waits 60s then retries up to 2 times */
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit,
-  maxRetries = 2,
-): Promise<Response> {
-  let lastRes: Response | undefined;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const res = await fetch(url, options);
-    if (res.status !== 429 && res.status !== 503) return res;
-    lastRes = res;
-    if (attempt < maxRetries) {
-      logger.info("Eightfold rate limited, waiting 60s before retry", {
-        status: res.status,
-        attempt: attempt + 1,
-        url: url.split("?")[0],
-      });
-      await delay(60_000);
-    }
-  }
-  return lastRes!;
 }
 
 function browserHeaders(host: string): Record<string, string> {
@@ -369,7 +346,7 @@ async function listPCSX(
       const unfilteredTotal = data.data?.count ?? 0;
       const discovered = discoverPCSXFilters(data, companyName);
 
-      if (discovered.toString()) {
+      if (discovered.size > 0) {
         // Merge discovered filters into filterParams for all subsequent requests
         for (const [key, value] of discovered) {
           filterParams.append(key, value);
@@ -431,10 +408,9 @@ async function listPCSX(
             }
           }
 
-          await acquireSlot(host);
-
           // Try PCSX detail API (unless already known to be blocked)
           if (!detailApiFailed) {
+            await acquireSlot(host);
             const detailUrl = `https://${host}/api/pcsx/position_details?domain=${encodeURIComponent(domain)}&position_id=${pos.id}`;
             const detailRes = await fetchWithRetry(detailUrl, {
               headers: browserHeaders(host),
@@ -449,15 +425,15 @@ async function listPCSX(
                   externalJobId: externalId,
                   title: detail.name ?? pos.name,
                   url: `https://${host}/careers/job/${pos.id}`,
-                  department: (detail.department as string) ?? pos.department ?? null,
+                  department: detail.department ?? pos.department ?? null,
                   locations: pos.locations ?? [],
-                  locationType: mapLocationType((detail.workLocationOption as string) ?? pos.workLocationOption),
+                  locationType: mapLocationType(detail.workLocationOption ?? pos.workLocationOption),
                   salaryMin: salary.min,
                   salaryMax: salary.max,
                   salaryCurrency: "USD",
                   jobDescriptionHtml: detail.jobDescription ?? "",
                   postedAt: (detail.postedTs ?? pos.postedTs)
-                    ? new Date(((detail.postedTs ?? pos.postedTs) as number) * 1000).toISOString().split("T")[0]
+                    ? new Date(((detail.postedTs ?? pos.postedTs)!) * 1000).toISOString().split("T")[0]
                     : null,
                   postingEndDate: null,
                 };
@@ -472,9 +448,7 @@ async function listPCSX(
           }
 
           // Fallback: fetch HTML page and parse JSON-LD
-          if (detailApiFailed) {
-            await acquireSlot(host);
-          }
+          await acquireSlot(host);
           const ld = await fetchJsonLdDetail(host, domain, pos.id);
           return {
             externalJobId: externalId,
