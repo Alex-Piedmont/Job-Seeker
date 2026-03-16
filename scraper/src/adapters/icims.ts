@@ -1,6 +1,7 @@
 import type { AtsAdapter, ScrapedJobData, ExistingJobRecord } from "./types.js";
 import { config } from "../config.js";
 import { hostRateLimiter } from "../utils/concurrency.js";
+import { fetchWithRetry } from "../utils/fetch-retry.js";
 import { logger } from "../utils/logger.js";
 
 // ---------------------------------------------------------------------------
@@ -25,7 +26,7 @@ interface JibeJob {
   salary_range?: string | null;
   tags?: string;
   tags1?: string;
-  tags2?: string;
+  tags2?: string | string[];
   tags3?: string;
   tags4?: string;
 }
@@ -39,6 +40,7 @@ interface JibeResponse {
 // ---------------------------------------------------------------------------
 
 const HOURLY_RATE_THRESHOLD = 1000;
+const RETAIL_DOMINANT_THRESHOLD = 0.8;
 
 /**
  * Parse salary from Jibe `salary_range` text field.
@@ -83,18 +85,79 @@ export class ICIMSAdapter implements AtsAdapter {
 
     logger.info("Starting iCIMS/Jibe scrape", { company: company.name, baseUrl: base });
 
-    while (true) {
-      await hostRateLimiter.acquire(hostname);
-      const url = `${base}/api/jobs?page=${page}&location=United+States&limit=100`;
-      const res = await fetch(url, {
-        headers: { "User-Agent": config.userAgent },
-      });
+    // --- Probe phase: detect retail-heavy companies and filter to corporate ---
+    let tags2Filter = "";
+    let cachedPage1: JibeResponse | null = null;
 
-      if (!res.ok) {
-        throw new Error(`iCIMS Jibe API returned ${res.status} for ${company.name} (page ${page})`);
+    await hostRateLimiter.acquire(hostname);
+    const probeUrl = `${base}/api/jobs?page=1&location=United+States&limit=100`;
+    const probeRes = await fetchWithRetry(probeUrl, {
+      headers: { "User-Agent": config.userAgent },
+    });
+
+    if (probeRes.ok) {
+      const probeData = (await probeRes.json()) as JibeResponse;
+      const probeJobs = probeData.jobs ?? [];
+
+      if (probeJobs.length >= 10) {
+        const tagCounts = new Map<string, number>();
+        for (const { data: job } of probeJobs) {
+          const raw = job.tags2;
+          const values = Array.isArray(raw) ? raw : raw ? [raw] : [];
+          for (const v of values) {
+            const trimmed = v.trim();
+            if (trimmed) tagCounts.set(trimmed, (tagCounts.get(trimmed) ?? 0) + 1);
+          }
+        }
+
+        if (tagCounts.size > 1) {
+          const sorted = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1]);
+          const [dominantTag, dominantCount] = sorted[0];
+          const corporateTag = Array.from(tagCounts.keys()).find((t) => t.toLowerCase().includes("corporate")) ?? "";
+
+          if (
+            dominantCount / probeJobs.length >= RETAIL_DOMINANT_THRESHOLD &&
+            corporateTag &&
+            corporateTag !== dominantTag
+          ) {
+            const params = new URLSearchParams({ tags2: corporateTag });
+            tags2Filter = `&${params}`;
+            logger.info("Detected retail-heavy company; filtering to corporate roles", {
+              company: company.name,
+              dominantTag,
+              dominantPct: `${((dominantCount / probeJobs.length) * 100).toFixed(1)}%`,
+              corporateTag,
+              tagDistribution: Object.fromEntries(tagCounts),
+            });
+          }
+        }
       }
 
-      const data = (await res.json()) as JibeResponse;
+      // Reuse probe response for page 1 when no filter was applied
+      if (!tags2Filter) {
+        cachedPage1 = probeData;
+      }
+    }
+
+    while (true) {
+      let data: JibeResponse;
+
+      if (page === 1 && cachedPage1) {
+        data = cachedPage1;
+      } else {
+        await hostRateLimiter.acquire(hostname);
+        const url = `${base}/api/jobs?page=${page}&location=United+States&limit=100${tags2Filter}`;
+        const res = await fetch(url, {
+          headers: { "User-Agent": config.userAgent },
+        });
+
+        if (!res.ok) {
+          throw new Error(`iCIMS Jibe API returned ${res.status} for ${company.name} (page ${page})`);
+        }
+
+        data = (await res.json()) as JibeResponse;
+      }
+
       if (!data.jobs || data.jobs.length === 0) break;
 
       for (const { data: job } of data.jobs) {
@@ -122,11 +185,12 @@ export class ICIMSAdapter implements AtsAdapter {
         }
 
         // Infer location type from all location text + tags
+        const tags2Str = Array.isArray(job.tags2) ? job.tags2.join(" ") : (job.tags2 ?? "");
         const allText = [
           ...locations,
           job.tags ?? "",
           job.tags1 ?? "",
-          job.tags2 ?? "",
+          tags2Str,
           job.tags3 ?? "",
           job.tags4 ?? "",
         ].join(" ");

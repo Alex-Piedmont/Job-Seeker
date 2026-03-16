@@ -25,6 +25,9 @@ function parseWorkdayUrl(baseUrl: string): { host: string; tenant: string; siteI
 /** Threshold below which parsed salary values are assumed to be hourly rates. */
 const HOURLY_RATE_THRESHOLD = 1000;
 
+/** If a single jobFamilyGroup category exceeds this share of total jobs, treat it as retail-dominant. */
+const RETAIL_DOMINANT_THRESHOLD = 0.8;
+
 /** Best-effort salary extraction from Workday HTML description. */
 function extractSalaryFromHtml(html: string): { min: number | null; max: number | null; isHourly: boolean } {
   // Common patterns: "Pay Range: $80,000 - $120,000", "$80,000.00 to $120,000.00"
@@ -136,6 +139,28 @@ export class WorkdayAdapter implements AtsAdapter {
         logger.info("Workday US country facet discovered", { company: company.name, param: countryFacet.facetParameter });
       } else {
         logger.warn("Workday US country facet not found, scraping without country filter", { company: company.name });
+      }
+
+      // Auto-detect retail-dominant jobFamilyGroup and filter to corporate categories
+      const jobFamilyFacet = facets.find((f) => f.facetParameter === "jobFamilyGroup");
+      if (jobFamilyFacet && jobFamilyFacet.values?.length >= 3) {
+        const totalFacetJobs = jobFamilyFacet.values.reduce((sum, v) => sum + v.count, 0);
+        const sorted = [...jobFamilyFacet.values].sort((a, b) => b.count - a.count);
+        const dominant = sorted[0];
+        if (totalFacetJobs > 0 && dominant.count / totalFacetJobs > RETAIL_DOMINANT_THRESHOLD) {
+          const corporateCategories = sorted.slice(1);
+          const corporateTotal = corporateCategories.reduce((sum, v) => sum + v.count, 0);
+          if (corporateTotal > 0) {
+            appliedFacets.jobFamilyGroup = corporateCategories.map((v) => v.id);
+            logger.info("Workday retail-dominant jobFamilyGroup detected, filtering to corporate categories", {
+              company: company.name,
+              excludedCategory: dominant.descriptor,
+              excludedCount: dominant.count,
+              corporateCategories: corporateCategories.length,
+              corporateJobCount: corporateTotal,
+            });
+          }
+        }
       }
 
       // Auto-discover full-time facet
