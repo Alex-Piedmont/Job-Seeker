@@ -28,6 +28,10 @@ const HOURLY_RATE_THRESHOLD = 1000;
 /** If a single jobFamilyGroup category exceeds this share of total jobs, treat it as retail-dominant. */
 const RETAIL_DOMINANT_THRESHOLD = 0.8;
 
+/** Tier 2: keyword patterns that identify retail/branch job family categories. */
+const RETAIL_KEYWORD_PATTERNS = [/\bstore\b/i, /\bretail\b/i, /\bbranch\b/i];
+const RETAIL_KEYWORD_THRESHOLD = 0.3;
+
 /** Best-effort salary extraction from Workday HTML description. */
 function extractSalaryFromHtml(html: string): { min: number | null; max: number | null; isHourly: boolean } {
   // Common patterns: "Pay Range: $80,000 - $120,000", "$80,000.00 to $120,000.00"
@@ -146,6 +150,8 @@ export class WorkdayAdapter implements AtsAdapter {
       if (jobFamilyFacet && jobFamilyFacet.values?.length >= 3) {
         const totalFacetJobs = jobFamilyFacet.values.reduce((sum, v) => sum + v.count, 0);
         const sorted = [...jobFamilyFacet.values].sort((a, b) => b.count - a.count);
+
+        // Tier 1: Single dominant category exceeds 80% (e.g. Dollar Tree, Lowe's, DaVita)
         const dominant = sorted[0];
         if (totalFacetJobs > 0 && dominant.count / totalFacetJobs > RETAIL_DOMINANT_THRESHOLD) {
           const corporateCategories = sorted.slice(1);
@@ -157,6 +163,28 @@ export class WorkdayAdapter implements AtsAdapter {
               excludedCategory: dominant.descriptor,
               excludedCount: dominant.count,
               corporateCategories: corporateCategories.length,
+              corporateJobCount: corporateTotal,
+            });
+          }
+        }
+
+        // Tier 2: Multiple retail/branch keyword categories collectively exceed 30% (e.g. CVS, PNC)
+        if (!appliedFacets.jobFamilyGroup && totalFacetJobs > 0) {
+          const matched = jobFamilyFacet.values.filter((v) =>
+            RETAIL_KEYWORD_PATTERNS.some((p) => p.test(v.descriptor)),
+          );
+          const matchedCount = matched.reduce((sum, v) => sum + v.count, 0);
+          const nonMatched = jobFamilyFacet.values.filter((v) =>
+            !RETAIL_KEYWORD_PATTERNS.some((p) => p.test(v.descriptor)),
+          );
+          if (matchedCount / totalFacetJobs > RETAIL_KEYWORD_THRESHOLD && nonMatched.length >= 2) {
+            const corporateTotal = nonMatched.reduce((sum, v) => sum + v.count, 0);
+            appliedFacets.jobFamilyGroup = nonMatched.map((v) => v.id);
+            logger.info("Workday retail/branch keyword filter applied", {
+              company: company.name,
+              matchedCategories: matched.map((v) => v.descriptor),
+              excludedCount: matchedCount,
+              corporateCategories: nonMatched.length,
               corporateJobCount: corporateTotal,
             });
           }
