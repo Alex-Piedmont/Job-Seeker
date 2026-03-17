@@ -85,78 +85,57 @@ export class ICIMSAdapter implements AtsAdapter {
 
     logger.info("Starting iCIMS/Jibe scrape", { company: company.name, baseUrl: base });
 
-    // --- Probe phase: detect retail-heavy companies and filter to corporate ---
+    // --- Probe phase: use facet list to detect retail-heavy companies ---
     let tags2Filter = "";
-    let cachedPage1: JibeResponse | null = null;
 
     await hostRateLimiter.acquire(hostname);
-    const probeUrl = `${base}/api/jobs?page=1&location=United+States&limit=100`;
+    const probeUrl = `${base}/api/jobs?page=1&location=United+States&limit=1`;
     const probeRes = await fetchWithRetry(probeUrl, {
       headers: { "User-Agent": config.userAgent },
     });
 
     if (probeRes.ok) {
-      const probeData = (await probeRes.json()) as JibeResponse;
-      const probeJobs = probeData.jobs ?? [];
+      const probeData = (await probeRes.json()) as { filter?: { facetList?: { tags2?: Array<{ term: string; count: number }> } } };
+      const tags2Facets = probeData.filter?.facetList?.tags2;
 
-      if (probeJobs.length >= 10) {
-        const tagCounts = new Map<string, number>();
-        for (const { data: job } of probeJobs) {
-          const raw = job.tags2;
-          const values = Array.isArray(raw) ? raw : raw ? [raw] : [];
-          for (const v of values) {
-            const trimmed = v.trim();
-            if (trimmed) tagCounts.set(trimmed, (tagCounts.get(trimmed) ?? 0) + 1);
-          }
+      if (tags2Facets && tags2Facets.length > 1) {
+        const totalCount = tags2Facets.reduce((sum, f) => sum + f.count, 0);
+        const sorted = [...tags2Facets].sort((a, b) => b.count - a.count);
+        const [dominant] = sorted;
+        const corporateFacet = tags2Facets.find((f) => f.term.toLowerCase().includes("corporate"));
+
+        if (
+          totalCount > 0 &&
+          dominant.count / totalCount >= RETAIL_DOMINANT_THRESHOLD &&
+          corporateFacet &&
+          corporateFacet.term !== dominant.term
+        ) {
+          const params = new URLSearchParams({ tags2: corporateFacet.term });
+          tags2Filter = `&${params}`;
+          logger.info("Detected retail-heavy company; filtering to corporate roles", {
+            company: company.name,
+            dominantTag: dominant.term,
+            dominantPct: `${((dominant.count / totalCount) * 100).toFixed(1)}%`,
+            corporateTag: corporateFacet.term,
+            corporateCount: corporateFacet.count,
+            totalCount,
+          });
         }
-
-        if (tagCounts.size > 1) {
-          const sorted = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1]);
-          const [dominantTag, dominantCount] = sorted[0];
-          const corporateTag = Array.from(tagCounts.keys()).find((t) => t.toLowerCase().includes("corporate")) ?? "";
-
-          if (
-            dominantCount / probeJobs.length >= RETAIL_DOMINANT_THRESHOLD &&
-            corporateTag &&
-            corporateTag !== dominantTag
-          ) {
-            const params = new URLSearchParams({ tags2: corporateTag });
-            tags2Filter = `&${params}`;
-            logger.info("Detected retail-heavy company; filtering to corporate roles", {
-              company: company.name,
-              dominantTag,
-              dominantPct: `${((dominantCount / probeJobs.length) * 100).toFixed(1)}%`,
-              corporateTag,
-              tagDistribution: Object.fromEntries(tagCounts),
-            });
-          }
-        }
-      }
-
-      // Reuse probe response for page 1 when no filter was applied
-      if (!tags2Filter) {
-        cachedPage1 = probeData;
       }
     }
 
     while (true) {
-      let data: JibeResponse;
+      await hostRateLimiter.acquire(hostname);
+      const url = `${base}/api/jobs?page=${page}&location=United+States&limit=100${tags2Filter}`;
+      const res = await fetchWithRetry(url, {
+        headers: { "User-Agent": config.userAgent },
+      });
 
-      if (page === 1 && cachedPage1) {
-        data = cachedPage1;
-      } else {
-        await hostRateLimiter.acquire(hostname);
-        const url = `${base}/api/jobs?page=${page}&location=United+States&limit=100${tags2Filter}`;
-        const res = await fetch(url, {
-          headers: { "User-Agent": config.userAgent },
-        });
-
-        if (!res.ok) {
-          throw new Error(`iCIMS Jibe API returned ${res.status} for ${company.name} (page ${page})`);
-        }
-
-        data = (await res.json()) as JibeResponse;
+      if (!res.ok) {
+        throw new Error(`iCIMS Jibe API returned ${res.status} for ${company.name} (page ${page})`);
       }
+
+      const data = (await res.json()) as JibeResponse;
 
       if (!data.jobs || data.jobs.length === 0) break;
 

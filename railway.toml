@@ -2,7 +2,7 @@
 buildCommand = "npm install && npx prisma generate && cd scraper && npm install"
 
 [deploy]
-startCommand = "cd scraper && npx tsx src/index.ts"
+startCommand = "cd scraper && NODE_OPTIONS='--max-old-space-size=3584' npx tsx src/index.ts"
 
 [[cron]]
 schedule = "0 0,12 * * *"
