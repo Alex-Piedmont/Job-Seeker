@@ -21,6 +21,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { useResizableDrawer } from "@/hooks/use-resizable-drawer";
+import { useAutoSave } from "@/hooks/use-auto-save";
+import { SaveIndicator } from "@/components/resume-source/save-indicator";
+import { SaveError } from "@/lib/save-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -83,11 +86,45 @@ export function ApplicationDetailDrawer({
   const [generations, setGenerations] = useState<Array<{
     id: string;
     markdownOutput: string;
+    editedMarkdown?: string | null;
     promptTokens: number;
     completionTokens: number;
     estimatedCost: number;
     createdAt: string;
   }>>([]);
+
+  // Auto-save resume edits
+  const {
+    status: resumeSaveStatus,
+    trigger: triggerResumeSave,
+    flush: flushResumeSave,
+  } = useAutoSave<{ generationId: string; editedMarkdown: string }>({
+    initialData: { generationId: "", editedMarkdown: "" },
+    onSave: async (data) => {
+      const res = await fetch(`/api/resume/${data.generationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ editedMarkdown: data.editedMarkdown }),
+      });
+      if (!res.ok) {
+        throw new SaveError("Failed to save resume edits", res.status);
+      }
+    },
+    debounceMs: 1000,
+  });
+
+  const handleEditMarkdown = useCallback(
+    (markdown: string) => {
+      setEditedMarkdown(markdown);
+      if (currentGeneration) {
+        triggerResumeSave({
+          generationId: currentGeneration.id,
+          editedMarkdown: markdown,
+        });
+      }
+    },
+    [currentGeneration, triggerResumeSave]
+  );
 
   const fetchApp = useCallback(async () => {
     try {
@@ -146,7 +183,7 @@ export function ApplicationDetailDrawer({
             markdownOutput: data[0].markdownOutput,
             originalMarkdown: data[0].markdownOutput,
           });
-          setEditedMarkdown(data[0].markdownOutput);
+          setEditedMarkdown(data[0].editedMarkdown ?? data[0].markdownOutput);
         }
       }
     } catch { /* non-critical */ }
@@ -267,7 +304,7 @@ export function ApplicationDetailDrawer({
   const ote = app ? computeOTE(app) : null;
 
   return (
-    <Sheet open={true} onOpenChange={(o) => !o && onClose()}>
+    <Sheet open={true} onOpenChange={(o) => { if (!o) { flushResumeSave(); onClose(); } }}>
       <SheetContent
         side="right"
         className="!max-w-none !p-0 !transition-none"
@@ -672,7 +709,15 @@ export function ApplicationDetailDrawer({
               <Separator />
 
               {/* Resume Generation */}
-              <CollapsibleSection title="Resume" defaultOpen={!!currentGeneration}>
+              <CollapsibleSection
+                title={
+                  <span className="flex items-center gap-2">
+                    Resume
+                    <SaveIndicator status={resumeSaveStatus} />
+                  </span>
+                }
+                defaultOpen={!!currentGeneration}
+              >
                 <div className="space-y-3">
                   <GenerateButton
                     jobApplicationId={app.id}
@@ -705,7 +750,7 @@ export function ApplicationDetailDrawer({
                       <ResumeEditor
                         originalMarkdown={currentGeneration.originalMarkdown}
                         editedMarkdown={editedMarkdown}
-                        onEdit={setEditedMarkdown}
+                        onEdit={handleEditMarkdown}
                       />
                     </>
                   )}
@@ -713,12 +758,13 @@ export function ApplicationDetailDrawer({
                   <GenerationHistory
                     generations={generations}
                     onSelect={(gen) => {
+                      flushResumeSave();
                       setCurrentGeneration({
                         id: gen.id,
                         markdownOutput: gen.markdownOutput,
                         originalMarkdown: gen.markdownOutput,
                       });
-                      setEditedMarkdown(gen.markdownOutput);
+                      setEditedMarkdown(gen.editedMarkdown ?? gen.markdownOutput);
                     }}
                     onViewAnswers={setAnswersToShow}
                     onViewReview={setReviewToShow}

@@ -24,6 +24,7 @@ export const GET = authenticatedHandler(async (_request, { userId, params }) => 
     select: {
       id: true,
       markdownOutput: true,
+      editedMarkdown: true,
       promptTokens: true,
       completionTokens: true,
       estimatedCost: true,

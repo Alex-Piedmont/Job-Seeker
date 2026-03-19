@@ -10,6 +10,7 @@ import { GRADE_COLORS, type ReviewResult } from "@/lib/resume-prompts/review";
 interface Generation {
   id: string;
   markdownOutput: string;
+  editedMarkdown?: string | null;
   promptTokens: number;
   completionTokens: number;
   estimatedCost: number;

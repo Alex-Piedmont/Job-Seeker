@@ -20,16 +20,16 @@ export const GET = authenticatedHandler(async (request, { userId, params }) => {
     );
   }
 
-  // Check for user-edited markdown (base64-encoded query param)
+  // Check for user-edited markdown: query param (legacy) > DB field > original
   const url = new URL(request.url);
-  const editedMarkdown = url.searchParams.get("markdown");
-  let markdown = generation.markdownOutput;
+  const queryMarkdown = url.searchParams.get("markdown");
+  let markdown = generation.editedMarkdown ?? generation.markdownOutput;
 
-  if (editedMarkdown) {
+  if (queryMarkdown) {
     try {
-      markdown = Buffer.from(editedMarkdown, "base64").toString("utf-8");
+      markdown = Buffer.from(queryMarkdown, "base64").toString("utf-8");
     } catch {
-      // Fall back to original if base64 decode fails
+      // Fall back to DB value if base64 decode fails
     }
   }
 

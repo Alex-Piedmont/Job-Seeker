@@ -26,6 +26,8 @@ enum AtsPlatform {
   ICIMS
   ORACLE
   SUCCESSFACTORS
+  SMARTRECRUITERS
+  EIGHTFOLD
 }
 
 enum ScrapeStatus {
@@ -359,6 +361,7 @@ model ResumeGeneration {
   totalTokens        Int      @default(0)
   estimatedCost      Float    @default(0)
   markdownOutput     String   @db.Text
+  editedMarkdown     String?  @db.Text
   modelId            String
   reviewJson         String?  @db.Text
   fitAnalysisJson    String?  @db.Text

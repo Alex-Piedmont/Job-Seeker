@@ -5,7 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface CollapsibleSectionProps {
-  title: string;
+  title: React.ReactNode;
   defaultOpen?: boolean;
   badge?: string;
   children: React.ReactNode;
