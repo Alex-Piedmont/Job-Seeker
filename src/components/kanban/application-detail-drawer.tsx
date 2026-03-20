@@ -854,7 +854,7 @@ export function ApplicationDetailDrawer({
 
       {/* Your Resume Modal */}
       <Dialog open={resumeModalOpen} onOpenChange={(o) => { if (!o) flushResumeSave(); setResumeModalOpen(o); }}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="!max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Your Resume
