@@ -41,6 +41,8 @@ export async function scrapeCompany(company: {
 
     const result = await upsertJobs(company.id, jobs, existingJobs);
 
+    const durationMs = Date.now() - startTime;
+
     logger.info("Scrape complete", {
       company: company.name,
       platform: company.atsPlatform,
@@ -50,19 +52,32 @@ export async function scrapeCompany(company: {
       removed: result.removed,
       reopened: result.reopened,
       skipped: result.skipped,
-      durationMs: Date.now() - startTime,
+      durationMs,
     });
 
     // FR-14: persist scrapeStartTime as lastScrapeAt only on success
     try {
-      await prisma.company.update({
-        where: { id: company.id },
-        data: {
-          lastScrapeAt: scrapeStartTime,
-          scrapeStatus: "SUCCESS",
-          scrapeError: null,
-        },
-      });
+      await prisma.$transaction([
+        prisma.company.update({
+          where: { id: company.id },
+          data: {
+            lastScrapeAt: scrapeStartTime,
+            scrapeStatus: "SUCCESS",
+            scrapeError: null,
+          },
+        }),
+        prisma.scrapeLog.create({
+          data: {
+            companyId: company.id,
+            status: "SUCCESS",
+            durationMs,
+            jobsFound: jobs.length,
+            jobsAdded: result.added,
+            jobsUpdated: result.updated,
+            jobsRemoved: result.removed,
+          },
+        }),
+      ]);
     } catch (dbErr) {
       logger.error("Failed to update company scrape status", {
         company: company.name,
@@ -73,23 +88,34 @@ export async function scrapeCompany(company: {
     status = "FAILURE";
     error = err instanceof Error ? err.message : String(err);
     error = error.slice(0, 1000);
+    const durationMs = Date.now() - startTime;
 
     logger.error("Scrape failed", {
       company: company.name,
       platform: company.atsPlatform,
       error,
-      durationMs: Date.now() - startTime,
+      durationMs,
     });
 
     // On failure, update status but do NOT advance lastScrapeAt
     try {
-      await prisma.company.update({
-        where: { id: company.id },
-        data: {
-          scrapeStatus: status,
-          scrapeError: error,
-        },
-      });
+      await prisma.$transaction([
+        prisma.company.update({
+          where: { id: company.id },
+          data: {
+            scrapeStatus: status,
+            scrapeError: error,
+          },
+        }),
+        prisma.scrapeLog.create({
+          data: {
+            companyId: company.id,
+            status: "FAILURE",
+            error,
+            durationMs,
+          },
+        }),
+      ]);
     } catch (dbErr) {
       logger.error("Failed to update company scrape status", {
         company: company.name,

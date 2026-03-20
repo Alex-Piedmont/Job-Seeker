@@ -45,6 +45,10 @@ export async function scrapeCompany(company: {
   const startTime = Date.now();
   let status: "SUCCESS" | "FAILURE" = "SUCCESS";
   let error: string | null = null;
+  let jobsFound: number | null = null;
+  let jobsAdded: number | null = null;
+  let jobsUpdated: number | null = null;
+  let jobsRemoved: number | null = null;
 
   try {
     if (streamScraper) {
@@ -54,6 +58,7 @@ export async function scrapeCompany(company: {
         await upsertJob(company.id, job);
         count++;
       });
+      jobsFound = count;
 
       console.log(
         `[scrape] ${company.name} complete — ${count} jobs upserted (${Date.now() - startTime}ms)`,
@@ -61,6 +66,10 @@ export async function scrapeCompany(company: {
     } else {
       const jobs = await batchScraper!(company);
       const result = await upsertJobs(company.id, jobs);
+      jobsFound = jobs.length;
+      jobsAdded = result.added;
+      jobsUpdated = result.updated;
+      jobsRemoved = result.removed;
 
       console.log(
         `[scrape] ${company.name} complete — ` +
@@ -78,12 +87,28 @@ export async function scrapeCompany(company: {
     );
   }
 
-  await prisma.company.update({
-    where: { id: company.id },
-    data: {
-      lastScrapeAt: new Date(),
-      scrapeStatus: status,
-      scrapeError: status === "SUCCESS" ? null : error,
-    },
-  });
+  const durationMs = Date.now() - startTime;
+
+  await prisma.$transaction([
+    prisma.company.update({
+      where: { id: company.id },
+      data: {
+        lastScrapeAt: new Date(),
+        scrapeStatus: status,
+        scrapeError: status === "SUCCESS" ? null : error,
+      },
+    }),
+    prisma.scrapeLog.create({
+      data: {
+        companyId: company.id,
+        status,
+        error: status === "SUCCESS" ? null : error,
+        durationMs,
+        jobsFound,
+        jobsAdded,
+        jobsUpdated,
+        jobsRemoved,
+      },
+    }),
+  ]);
 }

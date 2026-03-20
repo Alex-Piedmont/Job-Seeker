@@ -9,6 +9,7 @@ import { UsersTab } from "@/components/admin/users-tab";
 import { GenerationsTab } from "@/components/admin/generations-tab";
 import { FeedbackTab } from "@/components/admin/feedback-tab";
 import { JobSourcesTab } from "@/components/admin/job-sources-tab";
+import { ScrapeLogsTab } from "@/components/admin/scrape-logs-tab";
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -44,6 +45,7 @@ export default function AdminPage() {
           <TabsTrigger value="generations">Generations</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="job-sources">Job Sources</TabsTrigger>
+          <TabsTrigger value="scrape-logs">Scrape Logs</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-4">
           <OverviewTab />
@@ -59,6 +61,9 @@ export default function AdminPage() {
         </TabsContent>
         <TabsContent value="job-sources" className="mt-4">
           <JobSourcesTab />
+        </TabsContent>
+        <TabsContent value="scrape-logs" className="mt-4">
+          <ScrapeLogsTab />
         </TabsContent>
       </Tabs>
     </div>

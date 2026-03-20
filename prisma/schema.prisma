@@ -449,6 +449,7 @@ model Company {
   updatedAt     DateTime      @updatedAt
 
   scrapedJobs ScrapedJob[]
+  scrapeLogs  ScrapeLog[]
 
   @@index([enabled])
   @@map("companies")
@@ -499,4 +500,24 @@ model UserJobArchive {
   @@index([userId])
   @@index([scrapedJobId])
   @@map("user_job_archives")
+}
+
+model ScrapeLog {
+  id          String       @id @default(cuid())
+  companyId   String
+  status      ScrapeStatus
+  error       String?      @db.Text
+  durationMs  Int?
+  jobsFound   Int?
+  jobsAdded   Int?
+  jobsUpdated Int?
+  jobsRemoved Int?
+  createdAt   DateTime     @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("scrape_logs")
 }
