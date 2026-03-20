@@ -766,7 +766,7 @@ export function ApplicationDetailDrawer({
       </Dialog>
 
       <Dialog open={!!reviewToShow} onOpenChange={(o) => !o && setReviewToShow(null)}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="!max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Review Scorecard
@@ -836,7 +836,7 @@ export function ApplicationDetailDrawer({
 
       {/* Job Description Modal */}
       <Dialog open={jobDescriptionOpen} onOpenChange={setJobDescriptionOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="!max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Job Description</DialogTitle>
           </DialogHeader>
