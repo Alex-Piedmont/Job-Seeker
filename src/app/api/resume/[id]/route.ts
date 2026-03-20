@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticatedHandler } from "@/lib/api-handler";
 import { prisma } from "@/lib/prisma";
+import { validateBody } from "@/lib/validations";
 
 const updateSchema = z.object({
   editedMarkdown: z.string().max(100000),
@@ -10,11 +11,8 @@ const updateSchema = z.object({
 export const PATCH = authenticatedHandler(async (request, { userId, params }) => {
   const { id } = params;
 
-  const body = await request.json();
-  const parsed = updateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  }
+  const validation = await validateBody(request, updateSchema);
+  if (!validation.success) return validation.response;
 
   const generation = await prisma.resumeGeneration.findFirst({
     where: { id, userId },
@@ -27,9 +25,9 @@ export const PATCH = authenticatedHandler(async (request, { userId, params }) =>
 
   // Store null if edit matches original (no diff to persist)
   const editedValue =
-    parsed.data.editedMarkdown === generation.markdownOutput
+    validation.data.editedMarkdown === generation.markdownOutput
       ? null
-      : parsed.data.editedMarkdown;
+      : validation.data.editedMarkdown;
 
   await prisma.resumeGeneration.update({
     where: { id },

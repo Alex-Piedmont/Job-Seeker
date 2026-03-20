@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { Copy, Trash2, ExternalLink, AlertTriangle } from "lucide-react";
+import { Copy, Trash2, ExternalLink, AlertTriangle, FileText, FileUser, Star, History } from "lucide-react";
 import { GenerateButton } from "@/components/resume/generate-button";
 import { ResumeEditor } from "@/components/resume/resume-editor";
 import { DownloadButton } from "@/components/resume/download-button";
@@ -23,7 +23,7 @@ import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { useResizableDrawer } from "@/hooks/use-resizable-drawer";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { SaveIndicator } from "@/components/resume-source/save-indicator";
-import { SaveError } from "@/lib/save-error";
+import { fetchOrThrowSaveError } from "@/lib/fetch-with-save-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -68,6 +68,9 @@ export function ApplicationDetailDrawer({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [answersToShow, setAnswersToShow] = useState<Array<{ question: string; answer: string }> | null>(null);
   const [reviewToShow, setReviewToShow] = useState<ReviewResult | null>(null);
+  const [jobDescriptionOpen, setJobDescriptionOpen] = useState(false);
+  const [resumeModalOpen, setResumeModalOpen] = useState(false);
+  const [pastResumesOpen, setPastResumesOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUpdates = useRef<Record<string, unknown>>({});
 
@@ -90,6 +93,7 @@ export function ApplicationDetailDrawer({
     promptTokens: number;
     completionTokens: number;
     estimatedCost: number;
+    reviewJson?: string | null;
     createdAt: string;
   }>>([]);
 
@@ -101,27 +105,27 @@ export function ApplicationDetailDrawer({
   } = useAutoSave<{ generationId: string; editedMarkdown: string }>({
     initialData: { generationId: "", editedMarkdown: "" },
     onSave: async (data) => {
-      const res = await fetch(`/api/resume/${data.generationId}`, {
+      await fetchOrThrowSaveError(`/api/resume/${data.generationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ editedMarkdown: data.editedMarkdown }),
       });
-      if (!res.ok) {
-        throw new SaveError("Failed to save resume edits", res.status);
-      }
     },
     debounceMs: 1000,
   });
 
   const handleEditMarkdown = useCallback(
     (markdown: string) => {
-      setEditedMarkdown(markdown);
-      if (currentGeneration) {
-        triggerResumeSave({
-          generationId: currentGeneration.id,
-          editedMarkdown: markdown,
-        });
-      }
+      setEditedMarkdown((prev) => {
+        if (prev === markdown) return prev;
+        if (currentGeneration) {
+          triggerResumeSave({
+            generationId: currentGeneration.id,
+            editedMarkdown: markdown,
+          });
+        }
+        return markdown;
+      });
     },
     [currentGeneration, triggerResumeSave]
   );
@@ -303,6 +307,31 @@ export function ApplicationDetailDrawer({
 
   const ote = app ? computeOTE(app) : null;
 
+  const daysSincePosted = app?.datePosted
+    ? Math.floor((Date.now() - new Date(app.datePosted).getTime()) / 86400000)
+    : null;
+
+  const daysInStage = app
+    ? Math.floor(
+        (Date.now() - new Date(app.statusLogs?.[0]?.movedAt ?? app.createdAt).getTime()) / 86400000
+      )
+    : null;
+
+  // Get the latest review from the most recent generation that has one
+  const latestReview = (() => {
+    if (!generations.length) return null;
+    for (const gen of generations) {
+      if (gen.reviewJson) {
+        try {
+          return JSON.parse(gen.reviewJson) as ReviewResult;
+        } catch {
+          return null;
+        }
+      }
+    }
+    return null;
+  })();
+
   return (
     <Sheet open={true} onOpenChange={(o) => { if (!o) { flushResumeSave(); onClose(); } }}>
       <SheetContent
@@ -347,31 +376,16 @@ export function ApplicationDetailDrawer({
           <>
 
             <div className="space-y-4 mt-4">
-              {/* Status */}
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select value={app.columnId} onValueChange={handleColumnChange}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {columns.map((col) => (
-                      <SelectItem key={col.id} value={col.id}>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: col.color }}
-                          />
-                          {col.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Core Fields */}
+              {/* Opportunity */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Role</Label>
+                  <Input
+                    defaultValue={app.role}
+                    onBlur={(e) => handleFieldBlur("role", e.target.value)}
+                    maxLength={200}
+                  />
+                </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Company</Label>
                   <Input
@@ -380,13 +394,47 @@ export function ApplicationDetailDrawer({
                     maxLength={200}
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Role</Label>
+                  <Label className="text-xs">Date Posted</Label>
                   <Input
-                    defaultValue={app.role}
-                    onBlur={(e) => handleFieldBlur("role", e.target.value)}
-                    maxLength={200}
+                    type="date"
+                    defaultValue={
+                      app.datePosted
+                        ? new Date(app.datePosted).toISOString().split("T")[0]
+                        : ""
+                    }
+                    onBlur={(e) => handleFieldBlur("datePosted", e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    {daysSincePosted != null ? `${daysSincePosted} days ago` : "--"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Status</Label>
+                  <Select value={app.columnId} onValueChange={handleColumnChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {columns.map((col) => (
+                        <SelectItem key={col.id} value={col.id}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: col.color }}
+                            />
+                            {col.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {daysInStage != null ? `${daysInStage} days in stage` : "--"}
+                  </p>
                 </div>
               </div>
 
@@ -584,98 +632,47 @@ export function ApplicationDetailDrawer({
 
               <Separator />
 
-              {/* Dates */}
-              <CollapsibleSection title="Dates">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Date Posted</Label>
-                    <Input
-                      type="date"
-                      defaultValue={
-                        app.datePosted
-                          ? new Date(app.datePosted)
-                              .toISOString()
-                              .split("T")[0]
-                          : ""
-                      }
-                      onBlur={(e) =>
-                        handleFieldBlur("datePosted", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Date Applied</Label>
-                    <Input
-                      type="date"
-                      defaultValue={
-                        app.dateApplied
-                          ? new Date(app.dateApplied)
-                              .toISOString()
-                              .split("T")[0]
-                          : ""
-                      }
-                      onBlur={(e) =>
-                        handleFieldBlur("dateApplied", e.target.value)
-                      }
-                    />
-                  </div>
+              {/* Job Description & Your Fit */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Job Description & Your Fit</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    className="h-16 flex flex-col gap-1"
+                    onClick={() => setJobDescriptionOpen(true)}
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span className="text-xs">Job Description</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-16 flex flex-col gap-1"
+                    onClick={() => setResumeModalOpen(true)}
+                  >
+                    <FileUser className="h-4 w-4" />
+                    <span className="text-xs">Your Resume</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-16 flex flex-col gap-1"
+                    onClick={() => {
+                      if (latestReview) setReviewToShow(latestReview);
+                      else toast.info("No review available yet");
+                    }}
+                  >
+                    <Star className="h-4 w-4" />
+                    <span className="text-xs">View Review</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-16 flex flex-col gap-1"
+                    onClick={() => setPastResumesOpen(true)}
+                  >
+                    <History className="h-4 w-4" />
+                    <span className="text-xs">Past Resumes</span>
+                  </Button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Rejection Date</Label>
-                    <Input
-                      type="date"
-                      defaultValue={
-                        app.rejectionDate
-                          ? new Date(app.rejectionDate)
-                              .toISOString()
-                              .split("T")[0]
-                          : ""
-                      }
-                      onBlur={(e) =>
-                        handleFieldBlur("rejectionDate", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Closed Reason</Label>
-                    <div className="flex items-center gap-2 h-9">
-                      {app.closedReason ? (
-                        <Badge
-                          variant={
-                            app.closedReason === "ghosted"
-                              ? "secondary"
-                              : "destructive"
-                          }
-                        >
-                          {app.closedReason === "ghosted"
-                            ? "Ghosted"
-                            : "Rejected"}
-                        </Badge>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">
-                          --
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CollapsibleSection>
-
-              <Separator />
-
-              {/* Job Description */}
-              <CollapsibleSection title="Job Description" defaultOpen={false}>
-                <Textarea
-                  defaultValue={app.jobDescription ?? ""}
-                  onBlur={(e) =>
-                    handleFieldBlur("jobDescription", e.target.value)
-                  }
-                  rows={10}
-                  maxLength={50000}
-                  className="font-mono text-xs"
-                />
-              </CollapsibleSection>
+              </div>
 
               <Separator />
 
@@ -704,72 +701,6 @@ export function ApplicationDetailDrawer({
                   interviews={app.interviews}
                   onUpdated={fetchApp}
                 />
-              </CollapsibleSection>
-
-              <Separator />
-
-              {/* Resume Generation */}
-              <CollapsibleSection
-                title={
-                  <span className="flex items-center gap-2">
-                    Resume
-                    <SaveIndicator status={resumeSaveStatus} />
-                  </span>
-                }
-                defaultOpen={!!currentGeneration}
-              >
-                <div className="space-y-3">
-                  <GenerateButton
-                    jobApplicationId={app.id}
-                    hasResumeSource={hasResumeSource}
-                    hasJobDescription={!!app.jobDescription?.trim()}
-                    capReached={capReached}
-                    onGenerated={(result) => {
-                      setCurrentGeneration({
-                        id: result.id,
-                        markdownOutput: result.markdownOutput,
-                        originalMarkdown: result.markdownOutput,
-                      });
-                      setEditedMarkdown(result.markdownOutput);
-                      setUsageRefreshKey((k) => k + 1);
-                      // Refresh history
-                      fetchHistory();
-                    }}
-                    onUsageChanged={() => setUsageRefreshKey((k) => k + 1)}
-                  />
-
-                  {currentGeneration && (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <DownloadButton
-                          generationId={currentGeneration.id}
-                          editedMarkdown={editedMarkdown}
-                          originalMarkdown={currentGeneration.originalMarkdown}
-                        />
-                      </div>
-                      <ResumeEditor
-                        originalMarkdown={currentGeneration.originalMarkdown}
-                        editedMarkdown={editedMarkdown}
-                        onEdit={handleEditMarkdown}
-                      />
-                    </>
-                  )}
-
-                  <GenerationHistory
-                    generations={generations}
-                    onSelect={(gen) => {
-                      flushResumeSave();
-                      setCurrentGeneration({
-                        id: gen.id,
-                        markdownOutput: gen.markdownOutput,
-                        originalMarkdown: gen.markdownOutput,
-                      });
-                      setEditedMarkdown(gen.editedMarkdown ?? gen.markdownOutput);
-                    }}
-                    onViewAnswers={setAnswersToShow}
-                    onViewReview={setReviewToShow}
-                  />
-                </div>
               </CollapsibleSection>
 
               <Separator />
@@ -900,6 +831,99 @@ export function ApplicationDetailDrawer({
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Job Description Modal */}
+      <Dialog open={jobDescriptionOpen} onOpenChange={setJobDescriptionOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Job Description</DialogTitle>
+          </DialogHeader>
+          {app && (
+            <Textarea
+              defaultValue={app.jobDescription ?? ""}
+              onBlur={(e) => handleFieldBlur("jobDescription", e.target.value)}
+              rows={20}
+              maxLength={50000}
+              className="font-mono text-xs"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Your Resume Modal */}
+      <Dialog open={resumeModalOpen} onOpenChange={(o) => { if (!o) flushResumeSave(); setResumeModalOpen(o); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Your Resume
+              <SaveIndicator status={resumeSaveStatus} />
+            </DialogTitle>
+          </DialogHeader>
+          {app && (
+            <div className="space-y-3">
+              <GenerateButton
+                jobApplicationId={app.id}
+                hasResumeSource={hasResumeSource}
+                hasJobDescription={!!app.jobDescription?.trim()}
+                capReached={capReached}
+                onGenerated={(result) => {
+                  setCurrentGeneration({
+                    id: result.id,
+                    markdownOutput: result.markdownOutput,
+                    originalMarkdown: result.markdownOutput,
+                  });
+                  setEditedMarkdown(result.markdownOutput);
+                  setUsageRefreshKey((k) => k + 1);
+                  fetchHistory();
+                }}
+                onUsageChanged={() => setUsageRefreshKey((k) => k + 1)}
+              />
+
+              {currentGeneration && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <DownloadButton
+                      generationId={currentGeneration.id}
+                      editedMarkdown={editedMarkdown}
+                      originalMarkdown={currentGeneration.originalMarkdown}
+                    />
+                  </div>
+                  <ResumeEditor
+                    originalMarkdown={currentGeneration.originalMarkdown}
+                    editedMarkdown={editedMarkdown}
+                    onEdit={handleEditMarkdown}
+                  />
+                </>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Past Resumes Modal */}
+      <Dialog open={pastResumesOpen} onOpenChange={setPastResumesOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Past Resumes</DialogTitle>
+          </DialogHeader>
+          <GenerationHistory
+            generations={generations}
+            onSelect={(gen) => {
+              flushResumeSave();
+              setCurrentGeneration({
+                id: gen.id,
+                markdownOutput: gen.markdownOutput,
+                originalMarkdown: gen.markdownOutput,
+              });
+              setEditedMarkdown(gen.editedMarkdown ?? gen.markdownOutput);
+              setPastResumesOpen(false);
+              setResumeModalOpen(true);
+            }}
+            onViewAnswers={setAnswersToShow}
+            onViewReview={setReviewToShow}
+          />
         </DialogContent>
       </Dialog>
     </Sheet>

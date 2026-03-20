@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SaveError } from "@/lib/save-error";
 
@@ -108,6 +108,15 @@ export function useAutoSave<T>({
           // Silent failure on flush - best effort
         });
     }
+  }, []);
+
+  // Clear all timers on unmount to prevent state updates after unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
   }, []);
 
   return { status, trigger, flush };
