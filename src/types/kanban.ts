@@ -49,6 +49,7 @@ export interface ApplicationDetail {
   }>;
   notes: Array<{ id: string; content: string; createdAt: string }>;
   column: { id: string; name: string; columnType: string | null };
+  statusLogs: Array<{ movedAt: string }>;
   scrapedJobId: string | null;
   scrapedJob: { removedAt: string | null } | null;
 }
