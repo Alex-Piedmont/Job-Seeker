@@ -752,9 +752,8 @@ export async function scrapeOracle(
 
         if (!detailRes.ok) continue;
 
-        const detailData = (await detailRes.json()) as OracleDetailResponse;
-        const detail = detailData.items?.[0];
-        if (!detail) continue;
+        const detail = (await detailRes.json()) as OracleDetailResponse["items"][0];
+        if (!detail || !detail.Id) continue;
 
         const descriptionParts = [
           detail.ExternalDescriptionStr,

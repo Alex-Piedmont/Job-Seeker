@@ -21,6 +21,7 @@ export const config = {
       WORKDAY: 2,
       ORACLE: 3,
       SMARTRECRUITERS: 5,
+      EIGHTFOLD: 5,
     } as Record<string, number>,
     jobDetailConcurrency: 5,
     minRequestIntervalMs: 100,

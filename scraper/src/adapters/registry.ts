@@ -5,6 +5,8 @@ import { WorkdayAdapter } from "./workday.js";
 import { ICIMSAdapter } from "./icims.js";
 import { OracleAdapter } from "./oracle.js";
 import { SuccessFactorsAdapter } from "./successfactors.js";
+import { SmartRecruitersAdapter } from "./smartrecruiters.js";
+import { EightfoldAdapter } from "./eightfold.js";
 
 const adapters: Record<string, AtsAdapter> = {
   GREENHOUSE: new GreenhouseAdapter(),
@@ -13,6 +15,8 @@ const adapters: Record<string, AtsAdapter> = {
   ICIMS: new ICIMSAdapter(),
   ORACLE: new OracleAdapter(),
   SUCCESSFACTORS: new SuccessFactorsAdapter(),
+  SMARTRECRUITERS: new SmartRecruitersAdapter(),
+  EIGHTFOLD: new EightfoldAdapter(),
 };
 
 export function getAdapter(platform: string): AtsAdapter {
