@@ -113,6 +113,14 @@ export function KanbanBoard() {
   const [hiddenColumnIds, setHiddenColumnIds] = useState<Set<string>>(
     new Set()
   );
+  const [showGhosted, setShowGhosted] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return localStorage.getItem("kanban-show-ghosted") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [collapsedColumnIds, setCollapsedColumnIds] = useState<Set<string>>(
     () => {
       if (typeof window === "undefined") return new Set();
@@ -184,11 +192,12 @@ export function KanbanBoard() {
       .filter((col) => !hiddenColumnIds.has(col.id))
       .map((col) => ({
         ...col,
-        applications: col.applications.filter((app) =>
-          matchesSearch(app, searchQuery)
+        applications: col.applications.filter(
+          (app) =>
+            (showGhosted || !app.isGhosted) && matchesSearch(app, searchQuery)
         ),
       }));
-  }, [boardData, hiddenColumnIds, searchQuery]);
+  }, [boardData, hiddenColumnIds, searchQuery, showGhosted]);
 
   const columnIds = useMemo(
     () => filteredColumns.map((c) => `col-${c.id}`),
@@ -431,6 +440,62 @@ export function KanbanBoard() {
   const handleClearFilters = () => {
     setSearchQuery("");
     setHiddenColumnIds(new Set());
+    setShowGhosted(false);
+    try {
+      localStorage.setItem("kanban-show-ghosted", "false");
+    } catch { /* non-critical */ }
+  };
+
+  const handleToggleShowGhosted = () => {
+    setShowGhosted((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("kanban-show-ghosted", String(next));
+      } catch { /* non-critical */ }
+      return next;
+    });
+  };
+
+  const handleToggleGhost = async (applicationId: string, currentlyGhosted: boolean) => {
+    const newValue = !currentlyGhosted;
+
+    // Optimistic update
+    setBoardData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        columns: prev.columns.map((col) => ({
+          ...col,
+          applications: col.applications.map((app) =>
+            app.id === applicationId ? { ...app, isGhosted: newValue } : app
+          ),
+        })),
+      };
+    });
+
+    try {
+      const res = await fetch(`/api/kanban/applications/${applicationId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isGhosted: newValue }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      // Revert optimistic update
+      setBoardData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          columns: prev.columns.map((col) => ({
+            ...col,
+            applications: col.applications.map((app) =>
+              app.id === applicationId ? { ...app, isGhosted: currentlyGhosted } : app
+            ),
+          })),
+        };
+      });
+      toast.error("Failed to update ghosted status");
+    }
   };
 
   const handleToggleCollapse = (columnId: string) => {
@@ -524,6 +589,8 @@ export function KanbanBoard() {
         hiddenColumnIds={hiddenColumnIds}
         onToggleColumn={handleToggleColumn}
         onClearFilters={handleClearFilters}
+        showGhosted={showGhosted}
+        onToggleShowGhosted={handleToggleShowGhosted}
         onAddApplication={() => setCreateModalOpen(true)}
         applicationCount={boardData.applicationCount}
         applicationCap={boardData.applicationCap}
@@ -574,6 +641,9 @@ export function KanbanBoard() {
                                   columnColor={column.color}
                                   columnType={column.columnType}
                                   onClick={() => setSelectedAppId(app.id)}
+                                  onToggleGhost={() =>
+                                    handleToggleGhost(app.id, app.isGhosted)
+                                  }
                                   dragHandleProps={{
                                     style: cardStyle,
                                     listeners: cardListeners,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, X, Plus } from "lucide-react";
+import { Search, X, Plus, Ghost } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,8 @@ interface SearchFilterBarProps {
   hiddenColumnIds: Set<string>;
   onToggleColumn: (columnId: string) => void;
   onClearFilters: () => void;
+  showGhosted: boolean;
+  onToggleShowGhosted: () => void;
   onAddApplication: () => void;
   applicationCount: number;
   applicationCap: number;
@@ -35,12 +37,14 @@ export function SearchFilterBar({
   hiddenColumnIds,
   onToggleColumn,
   onClearFilters,
+  showGhosted,
+  onToggleShowGhosted,
   onAddApplication,
   applicationCount,
   applicationCap,
   isCapReached,
 }: SearchFilterBarProps) {
-  const hasActiveFilters = searchQuery.trim() !== "" || hiddenColumnIds.size > 0;
+  const hasActiveFilters = searchQuery.trim() !== "" || hiddenColumnIds.size > 0 || showGhosted;
 
   return (
     <div className="flex items-center gap-3 mb-4">
@@ -84,6 +88,16 @@ export function SearchFilterBar({
           ))}
         </PopoverContent>
       </Popover>
+
+      <Button
+        variant={showGhosted ? "secondary" : "outline"}
+        size="sm"
+        onClick={onToggleShowGhosted}
+        aria-pressed={showGhosted}
+      >
+        <Ghost className="h-4 w-4 mr-1" />
+        Ghosted
+      </Button>
 
       {hasActiveFilters && (
         <Button variant="ghost" size="sm" onClick={onClearFilters}>

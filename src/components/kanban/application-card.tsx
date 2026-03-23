@@ -1,6 +1,6 @@
 "use client";
 
-import { GripVertical, Clock, AlertTriangle } from "lucide-react";
+import { GripVertical, Clock, AlertTriangle, Ghost } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ interface ApplicationCardProps {
   columnColor: string;
   columnType: string | null;
   onClick: () => void;
+  onToggleGhost?: () => void;
   dragHandleProps?: DragHandleProps;
 }
 
@@ -27,6 +28,7 @@ export function ApplicationCard({
   columnColor,
   columnType,
   onClick,
+  onToggleGhost,
   dragHandleProps,
 }: ApplicationCardProps) {
   const compensation = getCompensationDisplay(application);
@@ -50,13 +52,16 @@ export function ApplicationCard({
     columnType,
   };
   const staleness = getStalenessLevel(staleInput);
+  const isTerminal = columnType === "CLOSED" || columnType === "OFFER";
+  const showGhostButton = onToggleGhost && staleness !== "none" && !isTerminal;
 
   return (
     <div
       className={cn(
         "group relative rounded-lg border bg-card p-4 shadow-sm cursor-grab hover:shadow-md hover:-translate-y-0.5 transition-[box-shadow,opacity] duration-200",
-        staleness === "muted" && "opacity-60",
-        staleness === "warning" && "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800"
+        staleness === "muted" && !application.isGhosted && "opacity-60",
+        staleness === "warning" && !application.isGhosted && "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800",
+        application.isGhosted && "opacity-50"
       )}
       style={{ borderLeftWidth: 3, borderLeftColor: columnColor }}
       onClick={onClick}
@@ -87,7 +92,7 @@ export function ApplicationCard({
               {staleness === "muted" && (
                 <Clock className="h-3.5 w-3.5 text-muted-foreground" />
               )}
-              {staleness === "warning" && (
+              {staleness === "warning" && !application.isGhosted && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
@@ -96,6 +101,33 @@ export function ApplicationCard({
                     No activity for 30+ days. Consider closing this application.
                   </TooltipContent>
                 </Tooltip>
+              )}
+              {showGhostButton && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        "rounded p-0.5 hover:bg-accent transition-colors",
+                        application.isGhosted && "text-violet-500"
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleGhost?.();
+                      }}
+                    >
+                      <Ghost className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {application.isGhosted
+                      ? "Remove ghosted status"
+                      : "Mark as ghosted"}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {application.isGhosted && !showGhostButton && (
+                <Ghost className="h-3.5 w-3.5 text-violet-500" />
               )}
               {resumeGrade && (
                 <span className={`inline-flex items-center justify-center h-5 w-5 rounded text-xs font-bold ${GRADE_COLORS[resumeGrade] || ""}`}>
