@@ -406,6 +406,7 @@ export function KanbanBoard() {
           newOrder: rejectionDialog.newOrder,
           rejectionDate,
           closedReason,
+          ...(closedReason === "ghosted" && { isGhosted: true }),
         }),
       });
       if (!res.ok) throw new Error();
