@@ -7,7 +7,7 @@ import { moveApplicationSchema } from "@/lib/validations/kanban";
 export const PUT = authenticatedHandler(async (request, { userId }) => {
   const validation = await validateBody(request, moveApplicationSchema);
   if (!validation.success) return validation.response;
-  const { id, columnId, newOrder, rejectionDate, closedReason } = validation.data;
+  const { id, columnId, newOrder, rejectionDate, closedReason, isGhosted } = validation.data;
 
   // Validate application belongs to user
   const application = await prisma.jobApplication.findFirst({
@@ -54,6 +54,11 @@ export const PUT = authenticatedHandler(async (request, { userId }) => {
       if (closedReason) {
         updateData.closedReason = closedReason;
       }
+    }
+
+    // Pass through isGhosted if provided
+    if (isGhosted !== undefined) {
+      updateData.isGhosted = isGhosted;
     }
 
     // Update the application

@@ -106,6 +106,7 @@ export const updateApplicationSchema = z
     dateApplied: optionalDate,
     rejectionDate: optionalDate,
     closedReason: closedReasonEnum.optional().nullable(),
+    isGhosted: z.boolean().optional(),
     jobDescription: z.string().max(50000).optional().nullable(),
   })
   .refine(
@@ -126,6 +127,7 @@ export const moveApplicationSchema = z.object({
   newOrder: z.number().int().min(0),
   rejectionDate: optionalDate,
   closedReason: closedReasonEnum.optional().nullable(),
+  isGhosted: z.boolean().optional(),
 });
 
 // ─── Interview Schemas ──────────────────────────────────────────────────────

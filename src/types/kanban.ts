@@ -35,6 +35,7 @@ export interface ApplicationDetail {
   dateApplied: string | null;
   rejectionDate: string | null;
   closedReason: string | null;
+  isGhosted: boolean;
   jobDescription: string | null;
   createdAt: string;
   updatedAt: string;
@@ -68,6 +69,7 @@ export interface ApplicationCardData {
   salaryMax: number | null;
   bonusTargetPct: number | null;
   variableComp: number | null;
+  isGhosted: boolean;
   updatedAt: string;
   _count: { interviews: number; notes: number };
   statusLogs: { movedAt: string }[];
