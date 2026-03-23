@@ -722,7 +722,7 @@ export async function scrapeOracle(
   let totalJobs = -1;
 
   while (true) {
-    const listUrl = `${apiBase}/recruitingCEJobRequisitions?finder=findReqs;siteNumber=${siteNumber},limit=${ORACLE_PAGE_SIZE},offset=${offset},sortBy=POSTING_DATES_DESC&onlyData=true&expand=requisitionList`;
+    const listUrl = `${apiBase}/recruitingCEJobRequisitions?finder=findReqs;siteNumber=${siteNumber},keyword=United%20States,limit=${ORACLE_PAGE_SIZE},offset=${offset},sortBy=POSTING_DATES_DESC&onlyData=true&expand=requisitionList`;
 
     const res = await fetch(listUrl, {
       headers: { "User-Agent": USER_AGENT },

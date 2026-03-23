@@ -98,6 +98,15 @@ function mapWorkplaceType(code: string | null | undefined): string | null {
 const API_VERSION = "11.13.18.05";
 const PAGE_SIZE = 25;
 
+/** JobFamily values to exclude — retail/branch banking roles (e.g., JPMorgan) */
+const EXCLUDED_JOB_FAMILIES = new Set([
+  "associate bankers",
+  "relationship bankers",
+  "private bankers",
+  "private client bankers",
+  "tellers",
+]);
+
 export class OracleAdapter implements AtsAdapter {
   async listJobs(
     company: { id: string; name: string; baseUrl: string; atsPlatform: string; lastScrapeAt: Date | null },
@@ -120,7 +129,7 @@ export class OracleAdapter implements AtsAdapter {
 
     // Paginate list endpoint
     while (true) {
-      const listUrl = `${apiBase}/recruitingCEJobRequisitions?finder=findReqs;siteNumber=${siteNumber},workLocationCountryCode=US,limit=${PAGE_SIZE},offset=${offset},sortBy=POSTING_DATES_DESC&onlyData=true&expand=requisitionList`;
+      const listUrl = `${apiBase}/recruitingCEJobRequisitions?finder=findReqs;siteNumber=${siteNumber},keyword=United%20States,limit=${PAGE_SIZE},offset=${offset},sortBy=POSTING_DATES_DESC&onlyData=true&expand=requisitionList`;
 
       await hostRateLimiter.acquire(host);
       const res = await fetch(listUrl, {
@@ -140,10 +149,11 @@ export class OracleAdapter implements AtsAdapter {
         logger.info("Oracle total jobs reported", { company: company.name, total: totalJobs });
       }
 
-      // Filter eligible jobs first (US + full-time), then fetch details concurrently
+      // Filter eligible jobs first (US + full-time + not retail banking), then fetch details concurrently
       const eligibleReqs = wrapper.requisitionList.filter((req) => {
         if (req.PrimaryLocationCountry !== "US") return false;
         if (req.JobType && !req.JobType.toLowerCase().includes("regular")) return false;
+        if (req.JobFamily && EXCLUDED_JOB_FAMILIES.has(req.JobFamily.toLowerCase())) return false;
         return true;
       });
 
@@ -189,9 +199,8 @@ export class OracleAdapter implements AtsAdapter {
               return null;
             }
 
-            const detailData = (await detailRes.json()) as OracleDetailResponse;
-            const detail = detailData.items?.[0];
-            if (!detail) return null;
+            const detail = (await detailRes.json()) as OracleDetailResponse["items"][0];
+            if (!detail || !detail.Id) return null;
 
             // Build description from available HTML fields
             const descriptionParts = [
