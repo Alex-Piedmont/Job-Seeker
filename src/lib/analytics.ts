@@ -275,12 +275,20 @@ export async function getClosureBreakdown(userId: string) {
 
   const totalApplications = await prisma.jobApplication.count({ where: { userId } });
 
-  if (closedColumnIds.length === 0 || totalApplications === 0) {
-    return {
-      closureRate: totalApplications > 0 ? 0 : null,
-      ghostedRate: null,
-      closuresByStage: [],
-    };
+  if (totalApplications === 0) {
+    return { closureRate: null, ghostedRate: null, closuresByStage: [] };
+  }
+
+  // ghostedRate covers all applications (not just closed), so compute it early
+  const totalGhostedAll = await prisma.jobApplication.count({
+    where: { userId, isGhosted: true },
+  });
+  const ghostedRateAll = totalGhostedAll > 0
+    ? Math.round((totalGhostedAll / totalApplications) * 1000) / 1000
+    : 0;
+
+  if (closedColumnIds.length === 0) {
+    return { closureRate: 0, ghostedRate: ghostedRateAll, closuresByStage: [] };
   }
 
   // Get closed applications with their closedReason
@@ -293,14 +301,13 @@ export async function getClosureBreakdown(userId: string) {
   if (totalClosed === 0) {
     return {
       closureRate: 0,
-      ghostedRate: null,
+      ghostedRate: ghostedRateAll,
       closuresByStage: [],
     };
   }
 
-  const ghostedCount = closedApps.filter((a) => a.closedReason === "ghosted").length;
   const closureRate = Math.round((totalClosed / totalApplications) * 1000) / 1000;
-  const ghostedRate = Math.round((ghostedCount / totalClosed) * 1000) / 1000;
+  const ghostedRate = ghostedRateAll;
 
   // Get the last status log that moved each app to a closed column
   const closedAppIds = closedApps.map((a) => a.id);
