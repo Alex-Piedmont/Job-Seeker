@@ -145,7 +145,14 @@ export function KanbanBoard() {
   const fetchBoard = useCallback(async () => {
     try {
       const res = await fetch("/api/kanban/columns");
-      if (!res.ok) throw new Error("Failed to load board");
+      if (!res.ok) {
+        if (res.status === 401) {
+          toast.error("Session expired. Please sign out and sign back in.");
+        } else {
+          toast.error("Failed to load board");
+        }
+        return;
+      }
       const columns: ColumnData[] = await res.json();
 
       const totalApps = columns.reduce(
@@ -477,7 +484,7 @@ export function KanbanBoard() {
   if (!boardData) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        Failed to load board. Please refresh the page.
+        Failed to load board. Try signing out and back in, or refresh the page.
       </div>
     );
   }

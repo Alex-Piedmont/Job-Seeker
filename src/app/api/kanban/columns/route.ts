@@ -43,6 +43,18 @@ export const GET = authenticatedHandler(async (_request, { userId }) => {
 
   // Auto-seed default columns on first visit
   if (columns.length === 0) {
+    // Verify user exists before seeding (JWT may outlive the DB row)
+    const userExists = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!userExists) {
+      return NextResponse.json(
+        { error: "User not found. Please sign out and sign back in." },
+        { status: 401 }
+      );
+    }
+
     await prisma.kanbanColumn.createMany({
       data: DEFAULT_COLUMNS.map((col) => ({
         userId,
