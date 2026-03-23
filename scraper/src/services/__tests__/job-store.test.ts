@@ -2,13 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
-    scrapedJob: {
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      findMany: vi.fn(),
-      updateMany: vi.fn(),
-    },
+    $queryRawUnsafe: vi.fn(),
   },
 }));
 
@@ -20,7 +14,7 @@ vi.mock("../../utils/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { upsertJobs } from "../job-store";
+import { upsertJobs, computeContentHash } from "../job-store";
 
 const makeJob = (overrides: Partial<{
   externalJobId: string;
@@ -33,6 +27,8 @@ const makeJob = (overrides: Partial<{
   salaryMax: number | null;
   salaryCurrency: string;
   jobDescriptionHtml: string;
+  postedAt: string | null;
+  postingEndDate: string | null;
 }> = {}) => ({
   externalJobId: "ext1",
   title: "Engineer",
@@ -44,6 +40,8 @@ const makeJob = (overrides: Partial<{
   salaryMax: 150000,
   salaryCurrency: "USD",
   jobDescriptionHtml: "<p>Description</p>",
+  postedAt: null,
+  postingEndDate: null,
   ...overrides,
 });
 
@@ -52,98 +50,96 @@ describe("upsertJobs", () => {
     vi.clearAllMocks();
   });
 
-  it("creates new jobs when none exist", async () => {
-    mockPrisma.scrapedJob.findUnique.mockResolvedValue(null);
-    mockPrisma.scrapedJob.create.mockResolvedValue({});
-    mockPrisma.scrapedJob.findMany.mockResolvedValue([]);
+  it("creates new jobs via batch upsert", async () => {
+    // First call: executeBatchUpsert (INSERT ... ON CONFLICT)
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([{ added: 1n, updated: 0n, reopened: 0n }])
+      // Second call: detectRemovals
+      .mockResolvedValueOnce([{ count: 0n }]);
 
     const result = await upsertJobs("company1", [makeJob()]);
 
     expect(result.added).toBe(1);
     expect(result.updated).toBe(0);
-    expect(mockPrisma.scrapedJob.create).toHaveBeenCalledOnce();
-    expect(mockPrisma.scrapedJob.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          companyId: "company1",
-          externalJobId: "ext1",
-          title: "Engineer",
-          jobDescriptionMd: "md:<p>Description</p>",
-        }),
-      })
-    );
+    expect(result.removed).toBe(0);
+    // First call should be the batch upsert INSERT
+    expect(mockPrisma.$queryRawUnsafe.mock.calls[0][0]).toContain("INSERT INTO scraped_jobs");
   });
 
-  it("updates existing jobs", async () => {
-    const existingJob = { id: "db-id-1", removedAt: null };
-    mockPrisma.scrapedJob.findUnique.mockResolvedValue(existingJob);
-    mockPrisma.scrapedJob.update.mockResolvedValue({});
-    mockPrisma.scrapedJob.findMany.mockResolvedValue([
-      { id: "db-id-1", externalJobId: "ext1" },
-    ]);
+  it("reports updated jobs from upsert", async () => {
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([{ added: 0n, updated: 1n, reopened: 0n }])
+      .mockResolvedValueOnce([{ count: 0n }]);
 
     const result = await upsertJobs("company1", [makeJob()]);
 
     expect(result.updated).toBe(1);
     expect(result.added).toBe(0);
-    expect(mockPrisma.scrapedJob.update).toHaveBeenCalledOnce();
-    expect(mockPrisma.scrapedJob.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "db-id-1" },
-        data: expect.objectContaining({
-          title: "Engineer",
-          removedAt: null,
-        }),
-      })
-    );
   });
 
-  it("detects removals for jobs not in scraped list", async () => {
-    mockPrisma.scrapedJob.findUnique.mockResolvedValue(null);
-    mockPrisma.scrapedJob.create.mockResolvedValue({});
-    mockPrisma.scrapedJob.findMany.mockResolvedValue([
-      { id: "db-id-old", externalJobId: "ext-old" },
-    ]);
-    mockPrisma.scrapedJob.updateMany.mockResolvedValue({ count: 1 });
+  it("detects removals via raw SQL", async () => {
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([{ added: 1n, updated: 0n, reopened: 0n }])
+      .mockResolvedValueOnce([{ count: 1n }]);
 
     const result = await upsertJobs("company1", [makeJob({ externalJobId: "ext-new" })]);
 
     expect(result.removed).toBe(1);
-    expect(mockPrisma.scrapedJob.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: { in: ["db-id-old"] } },
-        data: expect.objectContaining({ removedAt: expect.any(Date) }),
-      })
-    );
+    // Second call should be the detectRemovals query
+    const removalCall = mockPrisma.$queryRawUnsafe.mock.calls[1];
+    expect(removalCall[0]).toContain("removedAt");
+    expect(removalCall[1]).toBe("company1");
+    expect(removalCall[2]).toEqual(["ext-new"]);
   });
 
-  it("clears removedAt on re-opened job", async () => {
-    const existingJob = { id: "db-id-1", removedAt: new Date("2025-01-01") };
-    mockPrisma.scrapedJob.findUnique.mockResolvedValue(existingJob);
-    mockPrisma.scrapedJob.update.mockResolvedValue({});
-    mockPrisma.scrapedJob.findMany.mockResolvedValue([
-      { id: "db-id-1", externalJobId: "ext1" },
-    ]);
+  it("reports reopened jobs", async () => {
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([{ added: 0n, updated: 1n, reopened: 1n }])
+      .mockResolvedValueOnce([{ count: 0n }]);
 
-    await upsertJobs("company1", [makeJob()]);
+    const result = await upsertJobs("company1", [makeJob()]);
 
-    expect(mockPrisma.scrapedJob.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          removedAt: null,
-        }),
-      })
-    );
+    expect(result.reopened).toBe(1);
+    expect(result.updated).toBe(1);
   });
 
   it("returns zero removed when all jobs are still present", async () => {
-    mockPrisma.scrapedJob.findUnique.mockResolvedValue(null);
-    mockPrisma.scrapedJob.create.mockResolvedValue({});
-    mockPrisma.scrapedJob.findMany.mockResolvedValue([]);
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([{ added: 1n, updated: 0n, reopened: 0n }])
+      .mockResolvedValueOnce([{ count: 0n }]);
 
     const result = await upsertJobs("company1", [makeJob()]);
 
     expect(result.removed).toBe(0);
-    expect(mockPrisma.scrapedJob.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("skips markdown conversion when content hash matches", async () => {
+    const html = "<p>Description</p>";
+    const hash = computeContentHash(html);
+    const existing = new Map([["ext1", { externalJobId: "ext1", title: "Engineer", contentHash: hash }]]);
+
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([{ added: 0n, updated: 1n, reopened: 0n }])
+      .mockResolvedValueOnce([{ count: 0n }]);
+
+    const result = await upsertJobs("company1", [makeJob()], existing);
+
+    expect(result.skipped).toBe(1);
+  });
+
+  it("retries row-by-row when batch upsert fails", async () => {
+    mockPrisma.$queryRawUnsafe
+      // First call: batch fails
+      .mockRejectedValueOnce(new Error("batch error"))
+      // Second call: row-by-row retry succeeds
+      .mockResolvedValueOnce([{ added: 1n, updated: 0n, reopened: 0n }])
+      // Third call: detectRemovals
+      .mockResolvedValueOnce([{ count: 0n }]);
+
+    const result = await upsertJobs("company1", [makeJob()]);
+
+    expect(result.added).toBe(1);
+    // 3 calls: failed batch + successful row retry + detectRemovals
+    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(3);
   });
 });
