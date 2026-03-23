@@ -154,6 +154,7 @@ model JobApplication {
   rejectionDate       DateTime?
   jobDescription      String?   @db.Text
   closedReason        String?   // "rejected" or "ghosted"
+  isGhosted           Boolean   @default(false)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
