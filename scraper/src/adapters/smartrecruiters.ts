@@ -120,11 +120,11 @@ export class SmartRecruitersAdapter implements AtsAdapter {
     let detailSkipped = 0;
 
     logger.info("Starting SmartRecruiters scrape", { company: company.name, companyId });
-    logger.info("Server-side country filtering applied (country=US); client-side filter retained as safety net");
+    logger.info("Server-side country filtering applied (country=us); client-side filter retained as safety net");
 
     // Paginate list endpoint
     while (true) {
-      const listUrl = `${apiBase}/postings?limit=${PAGE_SIZE}&offset=${offset}&country=US`;
+      const listUrl = `${apiBase}/postings?limit=${PAGE_SIZE}&offset=${offset}&country=us`;
 
       await hostRateLimiter.acquire(API_HOST);
       const res = await fetchWithRetry(listUrl, {
