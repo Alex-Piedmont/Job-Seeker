@@ -161,7 +161,9 @@ describe("getClosureBreakdown", () => {
       { id: "c1", name: "Saved", columnType: null },
       { id: "c2", name: "Closed", columnType: "CLOSED" },
     ]);
-    mockPrisma.jobApplication.count.mockResolvedValue(5);
+    mockPrisma.jobApplication.count
+      .mockResolvedValueOnce(5)   // totalApplications
+      .mockResolvedValueOnce(0);  // totalGhostedAll (isGhosted: true)
     mockPrisma.jobApplication.findMany.mockResolvedValue([]);
     const result = await getClosureBreakdown("user1");
     expect(result.closuresByStage).toHaveLength(0);
@@ -174,7 +176,9 @@ describe("getClosureBreakdown", () => {
       { id: "c2", name: "Screening", columnType: null },
       { id: "c3", name: "Closed", columnType: "CLOSED" },
     ]);
-    mockPrisma.jobApplication.count.mockResolvedValue(10);
+    mockPrisma.jobApplication.count
+      .mockResolvedValueOnce(10)  // totalApplications
+      .mockResolvedValueOnce(2);  // totalGhostedAll (isGhosted: true)
     mockPrisma.jobApplication.findMany.mockResolvedValue([
       { id: "a1", closedReason: "rejected" },
       { id: "a2", closedReason: "ghosted" },
@@ -188,7 +192,8 @@ describe("getClosureBreakdown", () => {
 
     const result = await getClosureBreakdown("user1");
     expect(result.closureRate).toBe(0.3);
-    expect(result.ghostedRate).toBeCloseTo(0.667, 2);
+    // ghostedRate is now % of ALL apps (2 ghosted / 10 total = 0.2)
+    expect(result.ghostedRate).toBe(0.2);
     expect(result.closuresByStage).toHaveLength(2);
     // Applied stage: 1 rejected, 1 ghosted
     const applied = result.closuresByStage.find((s) => s.columnName === "Applied");
@@ -200,7 +205,9 @@ describe("getClosureBreakdown", () => {
     mockPrisma.kanbanColumn.findMany.mockResolvedValue([
       { id: "c1", name: "Closed", columnType: "CLOSED" },
     ]);
-    mockPrisma.jobApplication.count.mockResolvedValue(1);
+    mockPrisma.jobApplication.count
+      .mockResolvedValueOnce(1)   // totalApplications
+      .mockResolvedValueOnce(0);  // totalGhostedAll
     mockPrisma.jobApplication.findMany.mockResolvedValue([
       { id: "a1", closedReason: null },
     ]);
