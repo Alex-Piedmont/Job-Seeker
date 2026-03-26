@@ -40,13 +40,18 @@ export async function createConcurrencyLimiters(): Promise<{
 export class HostRateLimiter {
   private locks = new Map<string, Promise<void>>();
   private lastRequestTime = new Map<string, number>();
+  private readonly minIntervalMs: number;
+
+  constructor(minIntervalMs?: number) {
+    this.minIntervalMs = minIntervalMs ?? config.concurrency.minRequestIntervalMs;
+  }
 
   async acquire(hostname: string): Promise<void> {
     const prev = this.locks.get(hostname) ?? Promise.resolve();
     const current = prev.then(async () => {
       const now = Date.now();
       const lastTime = this.lastRequestTime.get(hostname) ?? 0;
-      const wait = Math.max(0, config.concurrency.minRequestIntervalMs - (now - lastTime));
+      const wait = Math.max(0, this.minIntervalMs - (now - lastTime));
       if (wait > 0) await delay(wait);
       this.lastRequestTime.set(hostname, Date.now());
     });
@@ -55,5 +60,8 @@ export class HostRateLimiter {
   }
 }
 
-/** Singleton host rate limiter shared across all adapters */
+/** Singleton host rate limiter shared across all adapters (100ms default) */
 export const hostRateLimiter = new HostRateLimiter();
+
+/** Workday-specific rate limiter shared across all *.myworkdayjobs.com hosts (500ms) */
+export const workdayRateLimiter = new HostRateLimiter(config.concurrency.workdayMinIntervalMs);

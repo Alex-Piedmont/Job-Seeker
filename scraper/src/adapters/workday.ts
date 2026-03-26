@@ -1,12 +1,17 @@
 import type { AtsAdapter, ScrapedJobData, ExistingJobRecord } from "./types.js";
 import { config } from "../config.js";
-import { hostRateLimiter } from "../utils/concurrency.js";
+import { workdayRateLimiter } from "../utils/concurrency.js";
 import { fetchWithRetry } from "../utils/fetch-retry.js";
 import { logger } from "../utils/logger.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Rate-limit wrapper: global Workday limiter (500ms across all hosts) */
+async function acquireSlot(): Promise<void> {
+  await workdayRateLimiter.acquire("__workday__");
+}
 
 /** Extract tenant and siteId from a Workday careers URL. */
 function parseWorkdayUrl(baseUrl: string): { host: string; tenant: string; siteId: string } {
@@ -111,7 +116,7 @@ export class WorkdayAdapter implements AtsAdapter {
     // Discover facets with an initial probe request
     const appliedFacets: Record<string, string[]> = {};
 
-    await hostRateLimiter.acquire(host);
+    await acquireSlot();
     const probeRes = await fetchWithRetry(listUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", "User-Agent": config.userAgent },
@@ -212,7 +217,7 @@ export class WorkdayAdapter implements AtsAdapter {
 
     // Paginate list endpoint
     while (true) {
-      await hostRateLimiter.acquire(host);
+      await acquireSlot();
       const listRes = await fetchWithRetry(listUrl, {
         method: "POST",
         headers: {
@@ -277,7 +282,7 @@ export class WorkdayAdapter implements AtsAdapter {
               }
             }
 
-            await hostRateLimiter.acquire(host);
+            await acquireSlot();
 
             const path = posting.externalPath.replace(/^\/job\//, "");
             const detailUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/job/${path}`;
