@@ -111,7 +111,7 @@ export class WorkdayAdapter implements AtsAdapter {
 
     // Create concurrency limiter for detail fetches within this company
     const pLimit = (await import("p-limit")).default;
-    const detailLimit = pLimit(config.concurrency.jobDetailConcurrency);
+    const detailLimit = pLimit(3);
 
     // Discover facets with an initial probe request
     const appliedFacets: Record<string, string[]> = {};
@@ -122,6 +122,11 @@ export class WorkdayAdapter implements AtsAdapter {
       headers: { "Content-Type": "application/json", "User-Agent": config.userAgent },
       body: JSON.stringify({ appliedFacets: {}, limit: 1, offset: 0, searchText: "" }),
     });
+
+    // Fail fast: if probe is blocked, don't waste a second request on pagination
+    if (probeRes.status === 403) {
+      throw new Error(`Workday probe blocked (403) for ${company.name}`);
+    }
 
     if (probeRes.ok) {
       const probeData = (await probeRes.json()) as CxsListResponse;
