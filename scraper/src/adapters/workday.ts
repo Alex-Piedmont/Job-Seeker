@@ -316,7 +316,7 @@ export class WorkdayAdapter implements AtsAdapter {
             }
 
             return {
-              externalJobId: info.jobReqId ?? posting.externalPath,
+              externalJobId: posting.externalPath,
               title: info.title ?? posting.title,
               url: info.externalUrl ?? `https://${host}/en-US/${siteId}/job/${path}`,
               department: info.jobFamilyGroup ?? null,
