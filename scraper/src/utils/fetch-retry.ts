@@ -3,7 +3,8 @@ import { delay } from "./delay.js";
 import { logger } from "./logger.js";
 
 /**
- * Wrapper around fetch that retries on 429 (rate limit) and 5xx (server error) responses.
+ * Wrapper around fetch that retries on 429 (rate limit), 403 (WAF/bot block),
+ * and 5xx (server error) responses.
  * Returns the response as-is for all other status codes — the caller handles non-OK responses.
  * If all retries are exhausted, returns the last failed response (does not throw).
  */
@@ -25,6 +26,33 @@ export async function fetchWithRetry(url: string, options?: RequestInit): Promis
       });
       await delay(config.delays.rateLimitWait);
       continue;
+    }
+
+    // 403 retry — WAF/bot detection blocks are often transient
+    if (lastResponse.status === 403) {
+      let forbiddenAttempts = 0;
+      let backoffMs = config.delays.forbiddenBackoff;
+
+      while (forbiddenAttempts < config.retries.forbidden) {
+        forbiddenAttempts++;
+        logger.warn("Forbidden (403), retrying with backoff", {
+          url,
+          attempt: forbiddenAttempts,
+          maxAttempts: config.retries.forbidden,
+          backoffMs,
+        });
+        await delay(backoffMs);
+        lastResponse = await fetch(url, options);
+
+        if (lastResponse.status !== 403) {
+          return lastResponse;
+        }
+
+        backoffMs *= 2;
+      }
+
+      // All 403 retries exhausted
+      return lastResponse;
     }
 
     if (lastResponse.status >= 500 && lastResponse.status < 600) {
