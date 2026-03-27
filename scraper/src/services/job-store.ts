@@ -64,6 +64,7 @@ export async function upsertJobs(
   }
 
   const preparedRows: PreparedRow[] = [];
+  const preparedIndex = new Map<string, number>(); // externalJobId -> index in preparedRows
 
   for (const job of scrapedJobs) {
     seenExternalIds.push(job.externalJobId);
@@ -84,7 +85,7 @@ export async function upsertJobs(
       jobDescriptionMd = htmlToMarkdown(job.jobDescriptionHtml);
     }
 
-    preparedRows.push({
+    const row: PreparedRow = {
       id: createId(), // Always pre-generate; only used for INSERT (ON CONFLICT uses existing row's id)
       companyId,
       externalJobId: job.externalJobId,
@@ -93,15 +94,24 @@ export async function upsertJobs(
       department: job.department,
       locationsJson: JSON.stringify(job.locations),
       locationType: job.locationType,
-      salaryMin: job.salaryMin,
-      salaryMax: job.salaryMax,
+      salaryMin: job.salaryMin != null ? Math.round(job.salaryMin) : null,
+      salaryMax: job.salaryMax != null ? Math.round(job.salaryMax) : null,
       salaryCurrency: job.salaryCurrency,
       jobDescriptionMd,
       contentHash,
       firstSeenAt: job.postedAt ? new Date(job.postedAt) : now,
       lastSeenAt: now,
       postingEndDate: job.postingEndDate ? new Date(job.postingEndDate) : null,
-    });
+    };
+
+    // Deduplicate: if adapter returned the same externalJobId twice, keep the later one
+    const existingIdx = preparedIndex.get(job.externalJobId);
+    if (existingIdx != null) {
+      preparedRows[existingIdx] = row;
+    } else {
+      preparedIndex.set(job.externalJobId, preparedRows.length);
+      preparedRows.push(row);
+    }
   }
 
   // Process in batches
