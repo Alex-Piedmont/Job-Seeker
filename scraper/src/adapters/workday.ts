@@ -2,6 +2,8 @@ import type { AtsAdapter, ScrapedJobData, ExistingJobRecord } from "./types.js";
 import { config } from "../config.js";
 import { workdayRateLimiter } from "../utils/concurrency.js";
 import { fetchWithRetry } from "../utils/fetch-retry.js";
+import { CookieJar } from "../utils/cookie-jar.js";
+import { harvestCookies } from "../utils/browser-cookies.js";
 import { logger } from "../utils/logger.js";
 
 // ---------------------------------------------------------------------------
@@ -116,16 +118,38 @@ export class WorkdayAdapter implements AtsAdapter {
     // Discover facets with an initial probe request
     const appliedFacets: Record<string, string[]> = {};
 
+    // Cookie jar for this company's session (used when browser fallback is needed)
+    let cookieJar: CookieJar | undefined;
+
     await acquireSlot();
-    const probeRes = await fetchWithRetry(listUrl, {
+    const probeOpts = {
       method: "POST",
       headers: { "Content-Type": "application/json", "User-Agent": config.userAgent },
       body: JSON.stringify({ appliedFacets: {}, limit: 1, offset: 0, searchText: "" }),
-    });
+    };
+    let probeRes = await fetchWithRetry(listUrl, probeOpts);
 
-    // Fail fast: if probe is blocked, don't waste a second request on pagination
+    // Browser cookie fallback: if probe is blocked, harvest cookies and retry
     if (probeRes.status === 403) {
-      throw new Error(`Workday probe blocked (403) for ${company.name}`);
+      logger.info("Browser cookie fallback triggered", {
+        company: company.name,
+        platform: company.atsPlatform,
+        url: company.baseUrl,
+      });
+
+      const harvest = await harvestCookies(company.baseUrl);
+      if (harvest) {
+        cookieJar = new CookieJar();
+        cookieJar.injectCookies(host, harvest.cookies);
+        cookieJar.setUserAgent(host, harvest.userAgent);
+
+        await acquireSlot();
+        probeRes = await fetchWithRetry(listUrl, probeOpts, { cookieJar });
+      }
+
+      if (probeRes.status === 403) {
+        throw new Error(`Workday probe blocked (403) for ${company.name} (browser fallback ${harvest ? "did not resolve" : "failed"})`);
+      }
     }
 
     if (probeRes.ok) {
@@ -235,7 +259,7 @@ export class WorkdayAdapter implements AtsAdapter {
           offset,
           searchText: "",
         }),
-      });
+      }, cookieJar ? { cookieJar } : undefined);
 
       if (!listRes.ok) {
         throw new Error(`Workday CXS list returned ${listRes.status} for ${company.name}`);
@@ -293,7 +317,7 @@ export class WorkdayAdapter implements AtsAdapter {
             const detailUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/job/${path}`;
             const detailRes = await fetchWithRetry(detailUrl, {
               headers: { "User-Agent": config.userAgent },
-            });
+            }, cookieJar ? { cookieJar } : undefined);
 
             if (!detailRes.ok) {
               logger.warn("Workday detail request failed", {
