@@ -12,6 +12,7 @@ vi.mock("../logger.js", () => ({
 
 import { fetchWithRetry } from "../fetch-retry";
 import { delay } from "../delay.js";
+import { CookieJar } from "../cookie-jar";
 
 function mockResponse(status: number): Response {
   return new Response(null, { status });
@@ -142,5 +143,75 @@ describe("fetchWithRetry", () => {
     expect(res.status).toBe(404);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(delay).not.toHaveBeenCalled();
+  });
+
+  // --- Cookie jar integration ---
+
+  it("injects Cookie header from jar into requests", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(mockResponse(200));
+
+    const jar = new CookieJar();
+    jar.injectCookies("example.com", [{ name: "__cf_bm", value: "abc123" }]);
+
+    await fetchWithRetry("https://example.com/api", { headers: { "Content-Type": "application/json" } }, { cookieJar: jar });
+
+    const calledHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    expect(calledHeaders.get("Cookie")).toBe("__cf_bm=abc123");
+    expect(calledHeaders.get("Content-Type")).toBe("application/json");
+  });
+
+  it("injects UA override from jar into requests", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(mockResponse(200));
+
+    const jar = new CookieJar();
+    jar.setUserAgent("example.com", "Mozilla/5.0 Chrome/131");
+
+    await fetchWithRetry("https://example.com/api", { headers: { "User-Agent": "OldBot/1.0" } }, { cookieJar: jar });
+
+    const calledHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    expect(calledHeaders.get("User-Agent")).toBe("Mozilla/5.0 Chrome/131");
+  });
+
+  it("captures Set-Cookie from response into jar", async () => {
+    const fetchMock = vi.mocked(fetch);
+    const resHeaders = new Headers();
+    resHeaders.append("set-cookie", "token=xyz; Path=/");
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 200, headers: resHeaders }));
+
+    const jar = new CookieJar();
+    await fetchWithRetry("https://example.com/api", undefined, { cookieJar: jar });
+
+    expect(jar.getCookieHeader("example.com")).toBe("token=xyz");
+  });
+
+  it("accumulates cookies across multiple fetchWithRetry calls", async () => {
+    const fetchMock = vi.mocked(fetch);
+
+    const res1Headers = new Headers();
+    res1Headers.append("set-cookie", "a=1");
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 200, headers: res1Headers }));
+
+    const res2Headers = new Headers();
+    res2Headers.append("set-cookie", "b=2");
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 200, headers: res2Headers }));
+
+    const jar = new CookieJar();
+    await fetchWithRetry("https://example.com/page1", undefined, { cookieJar: jar });
+    await fetchWithRetry("https://example.com/page2", undefined, { cookieJar: jar });
+
+    expect(jar.getCookieHeader("example.com")).toBe("a=1; b=2");
+  });
+
+  it("behaves identically without cookieJar (no regression)", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(mockResponse(200));
+
+    const res = await fetchWithRetry("https://example.com", { headers: { "User-Agent": "Bot/1.0" } });
+    expect(res.status).toBe(200);
+    // fetch called directly with original headers
+    const calledHeaders = fetchMock.mock.calls[0][1]?.headers;
+    expect(new Headers(calledHeaders).get("User-Agent")).toBe("Bot/1.0");
   });
 });
