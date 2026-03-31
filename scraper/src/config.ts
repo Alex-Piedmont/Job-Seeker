@@ -20,7 +20,7 @@ export const config = {
       LEVER: 8,
       SUCCESSFACTORS: 8,
       ICIMS: 4,
-      WORKDAY: 1,
+      WORKDAY: 3,
       ORACLE: 3,
       SMARTRECRUITERS: 5,
       EIGHTFOLD: 5,
