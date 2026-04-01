@@ -45,3 +45,13 @@ export function isUSLocation(location: string): boolean {
 
   return false;
 }
+
+/**
+ * Inclusive wrapper for Workday list-level pre-filtering.
+ * Returns true for empty/null/undefined (fetch detail to be safe)
+ * and delegates to isUSLocation() for non-empty strings.
+ */
+export function isLikelyUSLocation(text: string | null | undefined): boolean {
+  if (!text || text.trim() === "") return true;
+  return isUSLocation(text);
+}

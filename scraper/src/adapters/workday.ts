@@ -4,6 +4,7 @@ import { workdayRateLimiter } from "../utils/concurrency.js";
 import { fetchWithRetry } from "../utils/fetch-retry.js";
 import { CookieJar } from "../utils/cookie-jar.js";
 import { harvestCookies } from "../utils/browser-cookies.js";
+import { isLikelyUSLocation } from "../utils/location-filter.js";
 import { logger } from "../utils/logger.js";
 
 // ---------------------------------------------------------------------------
@@ -275,8 +276,19 @@ export class WorkdayAdapter implements AtsAdapter {
         logger.info("Workday total jobs reported", { company: company.name, total: totalJobs });
       }
 
+      // Pre-filter non-US jobs at list level before detail fetches
+      const eligible = data.jobPostings.filter((posting) => {
+        if (isLikelyUSLocation(posting.locationsText)) return true;
+        logger.info("Skipping non-US location (list filter)", {
+          company: company.name,
+          locationsText: posting.locationsText,
+          title: posting.title,
+        });
+        return false;
+      });
+
       // Fetch details concurrently within each page
-      const detailTasks = data.jobPostings.map((posting) =>
+      const detailTasks = eligible.map((posting) =>
         detailLimit(async (): Promise<ScrapedJobData | null> => {
           if (!posting.externalPath) {
             logger.warn("Workday posting missing externalPath, skipping", {
