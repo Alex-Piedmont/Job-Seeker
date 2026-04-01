@@ -27,7 +27,7 @@ export const config = {
     } as Record<string, number>,
     jobDetailConcurrency: 5,
     minRequestIntervalMs: 100,
-    workdayMinIntervalMs: 500,
+    workdayMinIntervalMs: parseInt(process.env.SCRAPER_WORKDAY_INTERVAL_MS ?? "300", 10),
   },
   archiveAfterDays: 7,
   playwrightTimeout: 30000,

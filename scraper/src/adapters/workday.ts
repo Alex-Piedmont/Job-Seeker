@@ -11,9 +11,9 @@ import { logger } from "../utils/logger.js";
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Rate-limit wrapper: global Workday limiter (500ms across all hosts) */
-async function acquireSlot(): Promise<void> {
-  await workdayRateLimiter.acquire("__workday__");
+/** Rate-limit wrapper: per-host Workday limiter */
+async function acquireSlot(host: string): Promise<void> {
+  await workdayRateLimiter.acquire(host);
 }
 
 /** Extract tenant and siteId from a Workday careers URL. */
@@ -122,7 +122,7 @@ export class WorkdayAdapter implements AtsAdapter {
     // Cookie jar for this company's session (used when browser fallback is needed)
     let cookieJar: CookieJar | undefined;
 
-    await acquireSlot();
+    await acquireSlot(host);
     const probeOpts = {
       method: "POST",
       headers: { "Content-Type": "application/json", "User-Agent": config.userAgent },
@@ -144,7 +144,7 @@ export class WorkdayAdapter implements AtsAdapter {
         cookieJar.injectCookies(host, harvest.cookies);
         cookieJar.setUserAgent(host, harvest.userAgent);
 
-        await acquireSlot();
+        await acquireSlot(host);
         probeRes = await fetchWithRetry(listUrl, probeOpts, { cookieJar });
       }
 
@@ -247,7 +247,7 @@ export class WorkdayAdapter implements AtsAdapter {
 
     // Paginate list endpoint
     while (true) {
-      await acquireSlot();
+      await acquireSlot(host);
       const listRes = await fetchWithRetry(listUrl, {
         method: "POST",
         headers: {
@@ -323,7 +323,7 @@ export class WorkdayAdapter implements AtsAdapter {
               }
             }
 
-            await acquireSlot();
+            await acquireSlot(host);
 
             const path = posting.externalPath.replace(/^\/job\//, "");
             const detailUrl = `https://${host}/wday/cxs/${tenant}/${siteId}/job/${path}`;
