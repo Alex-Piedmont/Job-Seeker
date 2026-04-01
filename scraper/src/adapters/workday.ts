@@ -114,7 +114,7 @@ export class WorkdayAdapter implements AtsAdapter {
 
     // Create concurrency limiter for detail fetches within this company
     const pLimit = (await import("p-limit")).default;
-    const detailLimit = pLimit(3);
+    const detailLimit = pLimit(config.concurrency.jobDetailConcurrency);
 
     // Discover facets with an initial probe request
     const appliedFacets: Record<string, string[]> = {};
@@ -240,7 +240,7 @@ export class WorkdayAdapter implements AtsAdapter {
     const jobs: ScrapedJobData[] = [];
     let offset = 0;
     let totalJobs = -1; // capture from first response only
-    const limit = 20;
+    const limit = 100;
     let detailSkipped = 0;
 
     logger.info("Starting Workday CXS scrape", { company: company.name, listUrl });
