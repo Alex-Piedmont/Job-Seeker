@@ -28,6 +28,7 @@ export const config = {
     jobDetailConcurrency: 5,
     minRequestIntervalMs: 100,
     workdayMinIntervalMs: parseInt(process.env.SCRAPER_WORKDAY_INTERVAL_MS ?? "300", 10),
+    workdayMaxJobsNoCountryFacet: parseInt(process.env.SCRAPER_WORKDAY_MAX_JOBS_NO_FACET ?? "5000", 10),
   },
   archiveAfterDays: 7,
   playwrightTimeout: 30000,

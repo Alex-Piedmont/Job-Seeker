@@ -237,6 +237,9 @@ export class WorkdayAdapter implements AtsAdapter {
       }
     }
 
+    const hasCountryFacet = Object.keys(appliedFacets).some((k) => k.toLowerCase().includes("country"));
+    const maxJobsCap = hasCountryFacet ? Infinity : config.concurrency.workdayMaxJobsNoCountryFacet;
+
     const jobs: ScrapedJobData[] = [];
     let offset = 0;
     let totalJobs = -1; // capture from first response only
@@ -247,6 +250,16 @@ export class WorkdayAdapter implements AtsAdapter {
 
     // Paginate list endpoint
     while (true) {
+      if (offset >= maxJobsCap) {
+        logger.warn("Workday job cap reached, stopping pagination", {
+          company: company.name,
+          totalReported: totalJobs,
+          cap: maxJobsCap,
+          jobsCollected: jobs.length,
+        });
+        break;
+      }
+
       await acquireSlot(host);
       const listRes = await fetchWithRetry(listUrl, {
         method: "POST",
