@@ -23,6 +23,14 @@ import { Button } from "@/components/ui/button";
 const gettingStartedSteps = [
   {
     step: 1,
+    title: "Find Open Roles",
+    description:
+      "Search for jobs by title, location, salary, and company. Once you find interesting roles, add them to your tracker!",
+    href: "/jobs",
+    icon: FileText,
+  },
+  {
+    step: 2,
     title: "Build your Resume Source",
     description:
       "Add your work history, skills, and education. This is the foundation for generating tailored resumes.",
@@ -30,7 +38,7 @@ const gettingStartedSteps = [
     icon: FileText,
   },
   {
-    step: 2,
+    step: 3,
     title: "Track your Applications",
     description:
       "Add job postings to the kanban board. Organize by stage — Applied, Interview, Offer, and more.",
@@ -38,7 +46,7 @@ const gettingStartedSteps = [
     icon: Kanban,
   },
   {
-    step: 3,
+    step: 4,
     title: "Generate Tailored Resumes",
     description:
       "From any application card, generate an AI-tailored resume matched to the job description.",
@@ -119,9 +127,7 @@ export default function DashboardPage() {
               <li className="flex gap-2">
                 <span className="shrink-0 font-medium text-foreground">Mar 2026</span>
                 <span>
-                  We&apos;re now importing job listings from <strong className="text-foreground">70+ companies</strong> with
-                  more being added consistently. Ongoing QA is in progress as we verify each
-                  source. Over <strong className="text-foreground">6,800+ roles</strong> are currently listed and growing. Please note that Accenture roles are showing the date pulled instead of the posting date. This will be fixed soon. 
+                  We&apos;re now importing information from <strong className="text-foreground">160+ companies</strong> with <strong className="text-foreground">70,000+ corporate roles</strong>. We are continuing with QA in the various sources to ensure that you receive multiple refreshes of the data daily. Please share your feedback, especially around additional sites you would like to be included!
                 </span>
               </li>
             </ul>
@@ -132,7 +138,7 @@ export default function DashboardPage() {
       {/* Getting Started Steps */}
       <section>
         <h2 className="mb-4 text-lg font-semibold">Getting Started</h2>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {gettingStartedSteps.map(({ step, title, description, href, icon: Icon }) => (
             <Card key={step} className="relative">
               <CardHeader>
@@ -149,7 +155,7 @@ export default function DashboardPage() {
                 </CardDescription>
                 <Button variant="outline" size="sm" asChild className="w-fit">
                   <Link href={href}>
-                    {step === 3 ? "Go to Applications" : "Get Started"}
+                    {step === 4 ? "Go to Applications" : "Get Started"}
                     <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Link>
                 </Button>

@@ -24,12 +24,21 @@ import { Menu, LogOut, Download, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { UsageBadge } from "@/components/resume/usage-badge";
 
-const navLinks = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/resume-source", label: "Resume Source" },
-  { href: "/applications", label: "Applications" },
-  { href: "/find-jobs", label: "Find Jobs" },
-  { href: "/analytics", label: "Analytics" },
+type NavItem =
+  | { kind: "link"; href: string; label: string }
+  | { kind: "divider" };
+
+const buildNavLinks = (userName?: string | null): NavItem[] => [
+  { kind: "link", href: "/find-jobs", label: "Find Jobs" },
+  { kind: "link", href: "/applications", label: "Applications" },
+  { kind: "link", href: "/analytics", label: "Analytics" },
+  { kind: "divider" },
+  { kind: "link", href: "/dashboard", label: "Getting Started" },
+  {
+    kind: "link",
+    href: "/resume-source",
+    label: `All About ${userName?.split(" ")[0] ?? "You"}`,
+  },
 ];
 
 export function NavBar() {
@@ -47,9 +56,10 @@ export function NavBar() {
     .join("")
     .toUpperCase() ?? "?";
 
-  const allLinks = isAdmin
-    ? [...navLinks, { href: "/admin", label: "Admin" }]
-    : navLinks;
+  const navItems = buildNavLinks(user.name);
+  const allItems: NavItem[] = isAdmin
+    ? [...navItems, { kind: "link", href: "/admin", label: "Admin" }]
+    : navItems;
 
   return (
     <nav className="border-b border-primary/10 bg-background/95 backdrop-blur-sm">
@@ -61,17 +71,21 @@ export function NavBar() {
 
         {/* Desktop nav links */}
         <div className="hidden items-center gap-1 md:flex">
-          {allLinks.map((link) => (
-            <Link key={link.href} href={link.href}>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={pathname.startsWith(link.href) ? "bg-accent text-accent-foreground" : ""}
-              >
-                {link.label}
-              </Button>
-            </Link>
-          ))}
+          {allItems.map((item, i) =>
+            item.kind === "divider" ? (
+              <Separator key={`div-${i}`} orientation="vertical" className="mx-1 h-5" />
+            ) : (
+              <Link key={item.href} href={item.href}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={pathname.startsWith(item.href) ? "bg-accent text-accent-foreground" : ""}
+                >
+                  {item.label}
+                </Button>
+              </Link>
+            )
+          )}
         </div>
 
         {/* User menu + mobile hamburger */}
@@ -139,16 +153,20 @@ export function NavBar() {
                 <SheetTitle>Job Seeker</SheetTitle>
               </SheetHeader>
               <div className="flex flex-col gap-1 pt-4">
-                {allLinks.map((link) => (
-                  <Link key={link.href} href={link.href}>
-                    <Button
-                      variant="ghost"
-                      className={`w-full justify-start ${pathname.startsWith(link.href) ? "bg-accent text-accent-foreground" : ""}`}
-                    >
-                      {link.label}
-                    </Button>
-                  </Link>
-                ))}
+                {allItems.map((item, i) =>
+                  item.kind === "divider" ? (
+                    <Separator key={`div-${i}`} className="my-2" />
+                  ) : (
+                    <Link key={item.href} href={item.href}>
+                      <Button
+                        variant="ghost"
+                        className={`w-full justify-start ${pathname.startsWith(item.href) ? "bg-accent text-accent-foreground" : ""}`}
+                      >
+                        {item.label}
+                      </Button>
+                    </Link>
+                  )
+                )}
                 <Separator className="my-2" />
                 <div className="flex items-center gap-2 px-4 py-1">
                   <span className="text-sm text-muted-foreground">Resumes:</span>
