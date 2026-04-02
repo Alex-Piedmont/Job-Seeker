@@ -4,9 +4,10 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/lib/auth.config";
 import { isAdminEmail } from "@/lib/admin";
+import type { NextAuthConfig } from "next-auth";
 import type { Role } from "@/generated/prisma/enums";
 
-const devProviders: Parameters<typeof NextAuth>[0]["providers"] = [];
+const devProviders: NextAuthConfig["providers"] = [];
 
 if (process.env.NODE_ENV !== "production") {
   const adminEmail =
