@@ -142,4 +142,47 @@ describe("upsertJobs", () => {
     // 3 calls: failed batch + successful row retry + detectRemovals
     expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(3);
   });
+
+  it("skips removals when seen count is less than 50% of previous active", async () => {
+    // Simulate 200 existing active jobs but adapter only returned 80
+    const existing = new Map(
+      Array.from({ length: 200 }, (_, i) => [
+        `ext-${i}`,
+        { externalJobId: `ext-${i}`, title: `Job ${i}`, contentHash: null },
+      ]),
+    );
+
+    // Only 1 job returned by adapter (well below 50% of 200)
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([{ added: 0n, updated: 1n, reopened: 0n }]);
+    // detectRemovals should NOT be called (guard triggers)
+
+    const result = await upsertJobs("company1", [makeJob({ externalJobId: "ext-0" })], existing);
+
+    expect(result.removed).toBe(0);
+    // Only 1 call: the batch upsert. No detectRemovals query.
+    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(1);
+  });
+
+  it("proceeds with removals when seen count is above 50% of previous active", async () => {
+    // Simulate 10 existing active jobs, adapter returned 8 (80% — above threshold)
+    const existing = new Map(
+      Array.from({ length: 10 }, (_, i) => [
+        `ext-${i}`,
+        { externalJobId: `ext-${i}`, title: `Job ${i}`, contentHash: null },
+      ]),
+    );
+
+    const jobs = Array.from({ length: 8 }, (_, i) => makeJob({ externalJobId: `ext-${i}` }));
+
+    mockPrisma.$queryRawUnsafe
+      .mockResolvedValueOnce([{ added: 0n, updated: 8n, reopened: 0n }])
+      .mockResolvedValueOnce([{ count: 2n }]);
+
+    const result = await upsertJobs("company1", jobs, existing);
+
+    expect(result.removed).toBe(2);
+    // 2 calls: batch upsert + detectRemovals
+    expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledTimes(2);
+  });
 });

@@ -150,7 +150,7 @@ export async function upsertJobs(
   }
 
   // Removal detection: single query per company
-  const removed = await detectRemovals(companyId, seenExternalIds);
+  const removed = await detectRemovals(companyId, seenExternalIds, existingJobs.size);
 
   return { added, updated, removed, reopened, skipped };
 }
@@ -274,9 +274,23 @@ async function executeBatchUpsert(
 async function detectRemovals(
   companyId: string,
   seenExternalIds: string[],
+  previousActiveCount: number = 0,
 ): Promise<number> {
   if (seenExternalIds.length === 0) {
     // No jobs seen -- don't mark everything as removed (adapter may have returned empty due to error)
+    return 0;
+  }
+
+  // Proportional guard: if seen count is less than half of previous active jobs,
+  // the scrape likely returned partial data (WAF 403s, adapter bug, filter issue).
+  // Skip removals to prevent mass false removals.
+  if (previousActiveCount > 0 && seenExternalIds.length < previousActiveCount * 0.5) {
+    logger.warn("Removal guard: seen count too low relative to active jobs, skipping removals", {
+      companyId,
+      previousActiveCount,
+      seenCount: seenExternalIds.length,
+      wouldRemoveEstimate: previousActiveCount - seenExternalIds.length,
+    });
     return 0;
   }
 

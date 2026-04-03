@@ -12,6 +12,11 @@ describe("isUSLocation", () => {
     "Seattle, WA",
     "Chicago, IL",
     "USA",
+    // Workday state-first format
+    "CA Burbank Bldg. 700, Second Century, Tower 1",
+    "VA Sterling 45580 Terminal Drive",
+    "MA Needham 117 Kendrick St",
+    "GA East Point - 3900 N Commerce Dr",
   ];
 
   const nonUSCases = [
@@ -21,6 +26,7 @@ describe("isUSLocation", () => {
     "",
     "Tokyo, Japan",
     "Mumbai, India",
+    "ON Toronto 123 Bay St",
   ];
 
   it.each(usCases)('returns true for "%s"', (location) => {
@@ -63,5 +69,17 @@ describe("isLikelyUSLocation", () => {
 
   it('returns false for "Mumbai, India"', () => {
     expect(isLikelyUSLocation("Mumbai, India")).toBe(false);
+  });
+
+  it('returns true for "2 Locations"', () => {
+    expect(isLikelyUSLocation("2 Locations")).toBe(true);
+  });
+
+  it('returns true for "5 Locations"', () => {
+    expect(isLikelyUSLocation("5 Locations")).toBe(true);
+  });
+
+  it('returns true for "N/A"', () => {
+    expect(isLikelyUSLocation("N/A")).toBe(true);
   });
 });

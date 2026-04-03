@@ -33,9 +33,13 @@ export function isUSLocation(location: string): boolean {
     if (lower.includes(keyword)) return true;
   }
 
-  // Check state abbreviations (e.g., "San Francisco, CA" or "CA")
-  // Match ", XX" or standalone two-letter code
-  const stateMatch = location.match(/,\s*([A-Z]{2})\b/) || location.match(/\b([A-Z]{2})$/);
+  // Check state abbreviations in multiple positions:
+  // - After comma: "San Francisco, CA"
+  // - End of string: "CA"
+  // - Start of string: "CA Burbank Bldg. 700" (Workday format)
+  const stateMatch = location.match(/,\s*([A-Z]{2})\b/)
+    || location.match(/\b([A-Z]{2})$/)
+    || location.match(/^([A-Z]{2})\s/);
   if (stateMatch && US_STATE_ABBREVIATIONS.has(stateMatch[1])) return true;
 
   // Check major cities
@@ -53,5 +57,9 @@ export function isUSLocation(location: string): boolean {
  */
 export function isLikelyUSLocation(text: string | null | undefined): boolean {
   if (!text || text.trim() === "") return true;
+  // Ambiguous multi-location markers (Workday: "2 Locations", "3 Locations")
+  if (/^\d+\s+Locations?$/i.test(text)) return true;
+  // Ambiguous placeholder
+  if (text.trim().toLowerCase() === "n/a") return true;
   return isUSLocation(text);
 }

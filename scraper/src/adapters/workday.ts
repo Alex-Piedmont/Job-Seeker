@@ -289,16 +289,19 @@ export class WorkdayAdapter implements AtsAdapter {
         logger.info("Workday total jobs reported", { company: company.name, total: totalJobs });
       }
 
-      // Pre-filter non-US jobs at list level before detail fetches
-      const eligible = data.jobPostings.filter((posting) => {
-        if (isLikelyUSLocation(posting.locationsText)) return true;
-        logger.info("Skipping non-US location (list filter)", {
-          company: company.name,
-          locationsText: posting.locationsText,
-          title: posting.title,
-        });
-        return false;
-      });
+      // Pre-filter non-US jobs at list level before detail fetches.
+      // Skip when country facet is active — API already returns US-only results.
+      const eligible = hasCountryFacet
+        ? data.jobPostings
+        : data.jobPostings.filter((posting) => {
+            if (isLikelyUSLocation(posting.locationsText)) return true;
+            logger.info("Skipping non-US location (list filter)", {
+              company: company.name,
+              locationsText: posting.locationsText,
+              title: posting.title,
+            });
+            return false;
+          });
 
       // Fetch details concurrently within each page
       const detailTasks = eligible.map((posting) =>
