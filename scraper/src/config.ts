@@ -24,6 +24,7 @@ export const config = {
       ORACLE: 3,
       SMARTRECRUITERS: 5,
       EIGHTFOLD: 5,
+      TALEO: 3,
     } as Record<string, number>,
     jobDetailConcurrency: 5,
     minRequestIntervalMs: 100,

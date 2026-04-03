@@ -14,7 +14,7 @@ const EIGHTFOLD_REQUEST_DELAY_MS = 750;
 // Types
 // ---------------------------------------------------------------------------
 
-type EightfoldVariant = "pcsx" | "smartapply";
+type EightfoldVariant = "pcsx" | "smartapply" | "careers-page";
 
 interface PCSXPosition {
   id: number;
@@ -149,6 +149,30 @@ async function detectVariant(host: string, domain: string): Promise<EightfoldVar
     }
   } catch {
     // PCSX not available, fall through
+  }
+
+  // PCSX unavailable — try careers search page for embedded positions (e.g., Netflix)
+  const careersUrl = `https://${host}/careers?query=&domain=${encodeURIComponent(domain)}&sort_by=relevance&triggerGo498=true`;
+  await acquireSlot(host);
+  try {
+    const pageRes = await fetchWithRetry(careersUrl, {
+      headers: {
+        ...browserHeaders(host),
+        "Accept": "text/html,application/xhtml+xml,*/*",
+      },
+      signal: AbortSignal.timeout(20000),
+    });
+
+    if (pageRes.ok) {
+      const html = await pageRes.text();
+      // Look for embedded positions array in the HTML
+      if (html.includes('"positions"') && html.includes('"posting_name"')) {
+        variantCache.set(host, "careers-page");
+        return "careers-page";
+      }
+    }
+  } catch {
+    // Fall through to smartapply
   }
 
   variantCache.set(host, "smartapply");
@@ -623,6 +647,175 @@ async function listSmartApply(
 }
 
 // ---------------------------------------------------------------------------
+// Careers-page variant (embedded positions + JSON-LD detail)
+// ---------------------------------------------------------------------------
+
+interface CareersPagePosition {
+  id: number;
+  name: string;
+  posting_name?: string;
+  location?: string;
+  locations?: string[];
+  department?: string;
+  work_location_option?: string;
+  t_create?: number;
+  t_update?: number;
+  type?: string;
+}
+
+async function listCareersPage(
+  host: string,
+  domain: string,
+  existingJobs: Map<string, ExistingJobRecord> | undefined,
+  companyName: string,
+): Promise<ScrapedJobData[]> {
+  const pLimit = (await import("p-limit")).default;
+  const detailLimit = pLimit(3);
+  const jobs: ScrapedJobData[] = [];
+  let detailSkipped = 0;
+
+  // Fetch the careers search page which embeds all positions
+  const careersUrl = `https://${host}/careers?query=&domain=${encodeURIComponent(domain)}&sort_by=relevance&triggerGo498=true`;
+  await acquireSlot(host);
+  const pageRes = await fetchWithRetry(careersUrl, {
+    headers: {
+      ...browserHeaders(host),
+      "Accept": "text/html,application/xhtml+xml,*/*",
+    },
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!pageRes.ok) {
+    logger.error("Eightfold careers-page fetch failed", { company: companyName, status: pageRes.status });
+    return [];
+  }
+
+  const html = await pageRes.text();
+
+  // Extract positions array from the page
+  // The positions are embedded as JSON in a script tag or inline data
+  let positions: CareersPagePosition[] = [];
+
+  // Strategy 1: Look for "positions":[ in a JSON object within a script tag
+  const jsonMatch = html.match(/"positions"\s*:\s*(\[[\s\S]*?\])\s*[,}]/);
+  if (jsonMatch) {
+    try {
+      positions = JSON.parse(jsonMatch[1]) as CareersPagePosition[];
+    } catch {
+      logger.warn("Eightfold careers-page: failed to parse positions JSON", { company: companyName });
+    }
+  }
+
+  if (positions.length === 0) {
+    // Strategy 2: Look for window.__INITIAL_STATE__ or similar data store
+    const stateMatch = html.match(/window\.__(?:INITIAL_STATE__|NUXT__|NEXT_DATA__)__\s*=\s*(\{[\s\S]*?\});?\s*<\/script>/);
+    if (stateMatch) {
+      try {
+        const state = JSON.parse(stateMatch[1]);
+        // Navigate to find positions array
+        const findPositions = (obj: unknown): CareersPagePosition[] | null => {
+          if (!obj || typeof obj !== "object") return null;
+          if (Array.isArray(obj)) return null;
+          const record = obj as Record<string, unknown>;
+          if (Array.isArray(record.positions)) return record.positions as CareersPagePosition[];
+          for (const val of Object.values(record)) {
+            const found = findPositions(val);
+            if (found) return found;
+          }
+          return null;
+        };
+        positions = findPositions(state) ?? [];
+      } catch {
+        // Skip
+      }
+    }
+  }
+
+  if (positions.length === 0) {
+    logger.warn("Eightfold careers-page: no positions found in HTML", { company: companyName });
+    return [];
+  }
+
+  logger.info("Eightfold careers-page positions found", { company: companyName, total: positions.length });
+
+  // Filter to US positions
+  const eligible = positions.filter((p) => {
+    const locs = p.locations ?? (p.location ? [p.location] : []);
+    return isUSPositionLocations(locs);
+  });
+
+  logger.info("Eightfold careers-page US-filtered", { company: companyName, eligible: eligible.length, total: positions.length });
+
+  // Fetch details concurrently via JSON-LD
+  const detailTasks = eligible.map((pos) =>
+    detailLimit(async (): Promise<ScrapedJobData | null> => {
+      try {
+        const externalId = String(pos.id);
+        const title = pos.posting_name ?? pos.name;
+        const locs = pos.locations ?? (pos.location ? [pos.location] : []);
+
+        // Content-hash skip
+        if (existingJobs) {
+          const existing = existingJobs.get(externalId);
+          if (existing && existing.contentHash && existing.title === title) {
+            detailSkipped++;
+            return {
+              externalJobId: externalId,
+              title,
+              url: `https://${host}/careers/job/${pos.id}`,
+              department: pos.department ?? null,
+              locations: locs,
+              locationType: mapLocationType(pos.work_location_option),
+              salaryMin: null,
+              salaryMax: null,
+              salaryCurrency: "USD",
+              jobDescriptionHtml: "",
+              postedAt: pos.t_create ? new Date(pos.t_create * 1000).toISOString().split("T")[0] : null,
+              postingEndDate: null,
+            };
+          }
+        }
+
+        await acquireSlot(host);
+        const ld = await fetchJsonLdDetail(host, domain, pos.id);
+
+        return {
+          externalJobId: externalId,
+          title,
+          url: `https://${host}/careers/job/${pos.id}`,
+          department: pos.department ?? null,
+          locations: locs,
+          locationType: mapLocationType(pos.work_location_option),
+          salaryMin: null,
+          salaryMax: null,
+          salaryCurrency: "USD",
+          jobDescriptionHtml: ld?.description ?? "",
+          postedAt: ld?.postedAt ?? (pos.t_create ? new Date(pos.t_create * 1000).toISOString().split("T")[0] : null),
+          postingEndDate: ld?.postingEndDate ?? null,
+        };
+      } catch (err) {
+        logger.warn("Eightfold careers-page detail error", {
+          company: companyName,
+          positionId: pos.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+      }
+    }),
+  );
+
+  const results = await Promise.allSettled(detailTasks);
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value) {
+      jobs.push(result.value);
+    }
+  }
+
+  logger.info("Eightfold careers-page scrape complete", { company: companyName, jobCount: jobs.length, detailSkipped });
+  return jobs;
+}
+
+// ---------------------------------------------------------------------------
 // Adapter
 // ---------------------------------------------------------------------------
 
@@ -640,6 +833,8 @@ export class EightfoldAdapter implements AtsAdapter {
 
     if (variant === "pcsx") {
       return listPCSX(host, domain, filterParams, existingJobs, company.name);
+    } else if (variant === "careers-page") {
+      return listCareersPage(host, domain, existingJobs, company.name);
     } else {
       return listSmartApply(host, domain, filterParams, existingJobs, company.name);
     }

@@ -3,6 +3,7 @@
  * Ported from scraper/src/services/job-store.ts to use the Next.js Prisma client.
  */
 
+import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import TurndownService from "turndown";
 import type { ScrapedJobData } from "./adapters";
@@ -39,6 +40,15 @@ function htmlToMarkdown(html: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Content hash (identical to scraper/src/services/job-store.ts)
+// ---------------------------------------------------------------------------
+
+function computeContentHash(html: string): string | null {
+  if (!html) return null;
+  return createHash("sha256").update(html).digest("hex");
+}
+
+// ---------------------------------------------------------------------------
 // Upsert
 // ---------------------------------------------------------------------------
 
@@ -46,6 +56,7 @@ export interface UpsertResult {
   added: number;
   updated: number;
   removed: number;
+  skipped: number;
 }
 
 export async function upsertJob(
@@ -53,7 +64,7 @@ export async function upsertJob(
   job: ScrapedJobData,
 ): Promise<void> {
   const now = new Date();
-  const jobDescriptionMd = htmlToMarkdown(job.jobDescriptionHtml);
+  const newHash = computeContentHash(job.jobDescriptionHtml);
 
   const existing = await prisma.scrapedJob.findUnique({
     where: {
@@ -62,6 +73,12 @@ export async function upsertJob(
   });
 
   if (existing) {
+    // Skip markdown conversion if content hash matches
+    const hashMatch = newHash && existing.contentHash === newHash;
+    const jobDescriptionMd = hashMatch
+      ? existing.jobDescriptionMd
+      : htmlToMarkdown(job.jobDescriptionHtml);
+
     await prisma.scrapedJob.update({
       where: { id: existing.id },
       data: {
@@ -74,12 +91,15 @@ export async function upsertJob(
         salaryMax: job.salaryMax,
         salaryCurrency: job.salaryCurrency,
         jobDescriptionMd,
+        contentHash: newHash,
         postingEndDate: job.postingEndDate ? new Date(job.postingEndDate) : null,
         lastSeenAt: now,
         removedAt: null,
       },
     });
   } else {
+    const jobDescriptionMd = htmlToMarkdown(job.jobDescriptionHtml);
+
     await prisma.scrapedJob.create({
       data: {
         companyId,
@@ -93,6 +113,7 @@ export async function upsertJob(
         salaryMax: job.salaryMax,
         salaryCurrency: job.salaryCurrency,
         jobDescriptionMd,
+        contentHash: newHash,
         firstSeenAt: job.postedAt ? new Date(job.postedAt) : now,
         lastSeenAt: now,
         postingEndDate: job.postingEndDate ? new Date(job.postingEndDate) : null,
@@ -111,9 +132,11 @@ export async function upsertJobs(
 
   const seenExternalIds = new Set<string>();
 
+  let skipped = 0;
+
   for (const job of scrapedJobs) {
     seenExternalIds.add(job.externalJobId);
-    const jobDescriptionMd = htmlToMarkdown(job.jobDescriptionHtml);
+    const newHash = computeContentHash(job.jobDescriptionHtml);
 
     const existing = await prisma.scrapedJob.findUnique({
       where: {
@@ -125,6 +148,14 @@ export async function upsertJobs(
     });
 
     if (existing) {
+      // Skip markdown conversion if content hash matches
+      const hashMatch = newHash && existing.contentHash === newHash;
+      const jobDescriptionMd = hashMatch
+        ? existing.jobDescriptionMd
+        : htmlToMarkdown(job.jobDescriptionHtml);
+
+      if (hashMatch) skipped++;
+
       await prisma.scrapedJob.update({
         where: { id: existing.id },
         data: {
@@ -137,6 +168,7 @@ export async function upsertJobs(
           salaryMax: job.salaryMax,
           salaryCurrency: job.salaryCurrency,
           jobDescriptionMd,
+          contentHash: newHash,
           postingEndDate: job.postingEndDate ? new Date(job.postingEndDate) : null,
           lastSeenAt: now,
           removedAt: null,
@@ -144,6 +176,8 @@ export async function upsertJobs(
       });
       updated++;
     } else {
+      const jobDescriptionMd = htmlToMarkdown(job.jobDescriptionHtml);
+
       await prisma.scrapedJob.create({
         data: {
           companyId,
@@ -157,6 +191,7 @@ export async function upsertJobs(
           salaryMax: job.salaryMax,
           salaryCurrency: job.salaryCurrency,
           jobDescriptionMd,
+          contentHash: newHash,
           firstSeenAt: job.postedAt ? new Date(job.postedAt) : now,
           lastSeenAt: now,
           postingEndDate: job.postingEndDate ? new Date(job.postingEndDate) : null,
@@ -185,5 +220,5 @@ export async function upsertJobs(
     removed = result.count;
   }
 
-  return { added, updated, removed };
+  return { added, updated, removed, skipped };
 }

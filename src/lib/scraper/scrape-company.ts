@@ -74,7 +74,7 @@ export async function scrapeCompany(company: {
       console.log(
         `[scrape] ${company.name} complete — ` +
         `${jobs.length} found, ${result.added} added, ${result.updated} updated, ` +
-        `${result.removed} removed (${Date.now() - startTime}ms)`,
+        `${result.removed} removed, ${result.skipped} skipped (${Date.now() - startTime}ms)`,
       );
     }
   } catch (err) {

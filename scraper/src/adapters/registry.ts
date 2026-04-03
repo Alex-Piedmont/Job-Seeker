@@ -7,6 +7,7 @@ import { OracleAdapter } from "./oracle.js";
 import { SuccessFactorsAdapter } from "./successfactors.js";
 import { SmartRecruitersAdapter } from "./smartrecruiters.js";
 import { EightfoldAdapter } from "./eightfold.js";
+import { TaleoAdapter } from "./taleo.js";
 
 const adapters: Record<string, AtsAdapter> = {
   GREENHOUSE: new GreenhouseAdapter(),
@@ -17,6 +18,7 @@ const adapters: Record<string, AtsAdapter> = {
   SUCCESSFACTORS: new SuccessFactorsAdapter(),
   SMARTRECRUITERS: new SmartRecruitersAdapter(),
   EIGHTFOLD: new EightfoldAdapter(),
+  TALEO: new TaleoAdapter(),
 };
 
 export function getAdapter(platform: string): AtsAdapter {

@@ -28,6 +28,7 @@ enum AtsPlatform {
   SUCCESSFACTORS
   SMARTRECRUITERS
   EIGHTFOLD
+  TALEO
 }
 
 enum ScrapeStatus {
