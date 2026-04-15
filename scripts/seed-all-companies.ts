@@ -40,6 +40,7 @@ const COMPANIES: CompanyEntry[] = [
   { name: "Broadcom", atsPlatform: "WORKDAY", baseUrl: "https://broadcom.wd1.myworkdayjobs.com/External_Career" },
   { name: "Applied Materials", atsPlatform: "WORKDAY", baseUrl: "https://amat.wd1.myworkdayjobs.com/External" },
   { name: "CrowdStrike", atsPlatform: "WORKDAY", baseUrl: "https://crowdstrike.wd5.myworkdayjobs.com/crowdstrikecareers" },
+  { name: "SailPoint", atsPlatform: "WORKDAY", baseUrl: "https://sailpoint.wd1.myworkdayjobs.com/SailPoint" },
   { name: "Dell Technologies", atsPlatform: "WORKDAY", baseUrl: "https://dell.wd1.myworkdayjobs.com/External" },
   { name: "Hewlett Packard Enterprise", atsPlatform: "WORKDAY", baseUrl: "https://hpe.wd5.myworkdayjobs.com/Jobsathpe" },
   { name: "Snap Inc.", atsPlatform: "WORKDAY", baseUrl: "https://snapchat.wd1.myworkdayjobs.com/snap" },
