@@ -17,6 +17,7 @@ export type { ApplicationCardData };
 interface ApplicationCardProps {
   application: ApplicationCardData;
   columnColor: string;
+  columnName: string;
   columnType: string | null;
   onClick: () => void;
   onToggleGhost?: () => void;
@@ -26,6 +27,7 @@ interface ApplicationCardProps {
 export function ApplicationCard({
   application,
   columnColor,
+  columnName,
   columnType,
   onClick,
   onToggleGhost,
@@ -45,10 +47,11 @@ export function ApplicationCard({
   })();
 
   const staleInput: StaleCheckInput = {
-    updatedAt: application.updatedAt,
+    createdAt: application.createdAt,
     latestStatusLogAt: application.statusLogs[0]?.movedAt ?? null,
     latestInterviewAt: application.interviews[0]?.createdAt ?? null,
     latestNoteAt: application.notes[0]?.createdAt ?? null,
+    columnName,
     columnType,
   };
   const staleness = getStalenessLevel(staleInput);

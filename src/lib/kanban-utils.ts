@@ -82,20 +82,19 @@ export function matchesSearch(
 export type StalenessLevel = "none" | "muted" | "warning";
 
 export interface StaleCheckInput {
-  updatedAt: string | Date;
+  // When the card landed in its current column (latest status log into the
+  // current column). Falls back to createdAt when the card has never moved.
   latestStatusLogAt?: string | Date | null;
+  createdAt: string | Date;
+  // Recruiter/interview activity that should refresh staleness for engagement
+  // columns only (Screening, Interview).
   latestInterviewAt?: string | Date | null;
   latestNoteAt?: string | Date | null;
+  columnName?: string | null;
   columnType?: string | null;
 }
 
-export function getLastActivity(input: StaleCheckInput): Date {
-  const dates = [new Date(input.updatedAt)];
-  if (input.latestStatusLogAt) dates.push(new Date(input.latestStatusLogAt));
-  if (input.latestInterviewAt) dates.push(new Date(input.latestInterviewAt));
-  if (input.latestNoteAt) dates.push(new Date(input.latestNoteAt));
-  return new Date(Math.max(...dates.map((d) => d.getTime())));
-}
+const ENGAGEMENT_COLUMN_NAMES = new Set(["Screening", "Interview"]);
 
 export function getStalenessLevel(
   input: StaleCheckInput,
@@ -106,7 +105,26 @@ export function getStalenessLevel(
     return "none";
   }
 
-  const lastActivity = getLastActivity(input);
+  // Time-in-stage: when the card entered its current column.
+  // updatedAt is intentionally NOT used — it is touched by Prisma's @updatedAt
+  // on unrelated row writes (e.g., columnOrder reorders), which would mask
+  // genuine staleness.
+  const stageStart = new Date(input.latestStatusLogAt ?? input.createdAt);
+  let lastActivity = stageStart;
+
+  // Engagement columns let recruiter notes and interview records refresh the
+  // clock — ongoing dialogue or scheduled interviews mean the card is alive.
+  if (input.columnName && ENGAGEMENT_COLUMN_NAMES.has(input.columnName)) {
+    if (input.latestNoteAt) {
+      const t = new Date(input.latestNoteAt);
+      if (t > lastActivity) lastActivity = t;
+    }
+    if (input.latestInterviewAt) {
+      const t = new Date(input.latestInterviewAt);
+      if (t > lastActivity) lastActivity = t;
+    }
+  }
+
   const daysSinceActivity = Math.floor(
     (now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24)
   );
