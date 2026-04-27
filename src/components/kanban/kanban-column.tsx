@@ -85,6 +85,7 @@ export function KanbanColumn({
               key={app.id}
               application={app}
               columnColor={column.color}
+              columnName={column.name}
               columnType={column.columnType}
               onClick={() => onCardClick(app.id)}
             />

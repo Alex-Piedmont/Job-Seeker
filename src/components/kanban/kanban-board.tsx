@@ -537,7 +537,13 @@ export function KanbanBoard() {
     if (!activeId || activeType !== "card") return null;
     for (const col of filteredColumns) {
       const app = col.applications.find((a) => a.id === String(activeId));
-      if (app) return { app, color: col.color, columnType: col.columnType };
+      if (app)
+        return {
+          app,
+          color: col.color,
+          name: col.name,
+          columnType: col.columnType,
+        };
     }
     return null;
   }, [activeId, activeType, filteredColumns]);
@@ -640,6 +646,7 @@ export function KanbanBoard() {
                                 <ApplicationCard
                                   application={app}
                                   columnColor={column.color}
+                                  columnName={column.name}
                                   columnType={column.columnType}
                                   onClick={() => setSelectedAppId(app.id)}
                                   onToggleGhost={() =>
@@ -703,6 +710,7 @@ export function KanbanBoard() {
             <ApplicationCard
               application={activeCard.app}
               columnColor={activeCard.color}
+              columnName={activeCard.name}
               columnType={activeCard.columnType}
               onClick={() => {}}
             />

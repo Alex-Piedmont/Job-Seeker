@@ -70,7 +70,7 @@ export interface ApplicationCardData {
   bonusTargetPct: number | null;
   variableComp: number | null;
   isGhosted: boolean;
-  updatedAt: string;
+  createdAt: string;
   _count: { interviews: number; notes: number };
   statusLogs: { movedAt: string }[];
   notes: { createdAt: string }[];

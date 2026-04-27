@@ -6,7 +6,6 @@ import {
   getCompensationDisplay,
   matchesSearch,
   getStalenessLevel,
-  getLastActivity,
   DEFAULT_COLUMNS,
 } from "../kanban-utils";
 
@@ -171,28 +170,57 @@ describe("matchesSearch", () => {
 describe("getStalenessLevel", () => {
   const now = new Date("2026-03-01T12:00:00Z");
 
-  it("returns 'none' for recently active cards", () => {
+  it("returns 'none' when card recently entered current stage", () => {
     expect(
       getStalenessLevel(
-        { updatedAt: "2026-02-28T12:00:00Z", columnType: null },
+        {
+          createdAt: "2026-01-01T00:00:00Z",
+          latestStatusLogAt: "2026-02-28T12:00:00Z",
+          columnName: "Applied",
+          columnType: null,
+        },
         now
       )
     ).toBe("none");
   });
 
-  it("returns 'muted' for 14+ day inactive cards", () => {
+  it("returns 'muted' at 14+ days in stage", () => {
     expect(
       getStalenessLevel(
-        { updatedAt: "2026-02-14T12:00:00Z", columnType: null },
+        {
+          createdAt: "2026-01-01T00:00:00Z",
+          latestStatusLogAt: "2026-02-14T12:00:00Z",
+          columnName: "Applied",
+          columnType: null,
+        },
         now
       )
     ).toBe("muted");
   });
 
-  it("returns 'warning' for 30+ day inactive cards", () => {
+  it("returns 'warning' at 30+ days in stage", () => {
     expect(
       getStalenessLevel(
-        { updatedAt: "2026-01-15T12:00:00Z", columnType: null },
+        {
+          createdAt: "2026-01-01T00:00:00Z",
+          latestStatusLogAt: "2026-01-15T12:00:00Z",
+          columnName: "Applied",
+          columnType: null,
+        },
+        now
+      )
+    ).toBe("warning");
+  });
+
+  it("falls back to createdAt when card has never moved columns", () => {
+    expect(
+      getStalenessLevel(
+        {
+          createdAt: "2026-01-15T12:00:00Z",
+          latestStatusLogAt: null,
+          columnName: "Saved",
+          columnType: null,
+        },
         now
       )
     ).toBe("warning");
@@ -201,7 +229,12 @@ describe("getStalenessLevel", () => {
   it("returns 'none' for CLOSED column cards regardless of age", () => {
     expect(
       getStalenessLevel(
-        { updatedAt: "2025-01-01T00:00:00Z", columnType: "CLOSED" },
+        {
+          createdAt: "2025-01-01T00:00:00Z",
+          latestStatusLogAt: "2025-01-01T00:00:00Z",
+          columnName: "Closed",
+          columnType: "CLOSED",
+        },
         now
       )
     ).toBe("none");
@@ -210,48 +243,124 @@ describe("getStalenessLevel", () => {
   it("returns 'none' for OFFER column cards regardless of age", () => {
     expect(
       getStalenessLevel(
-        { updatedAt: "2025-01-01T00:00:00Z", columnType: "OFFER" },
+        {
+          createdAt: "2025-01-01T00:00:00Z",
+          latestStatusLogAt: "2025-01-01T00:00:00Z",
+          columnName: "Offer",
+          columnType: "OFFER",
+        },
         now
       )
     ).toBe("none");
   });
 
-  it("uses most recent activity across all sources", () => {
-    // updatedAt is old, but latestNoteAt is recent
+  it("Applied column ignores notes and interviews — only stage time matters", () => {
+    // Card has been in Applied for 35 days; a recent note must NOT reset it.
     expect(
       getStalenessLevel(
         {
-          updatedAt: "2025-01-01T00:00:00Z",
-          latestStatusLogAt: "2025-01-01T00:00:00Z",
-          latestInterviewAt: null,
+          createdAt: "2026-01-01T00:00:00Z",
+          latestStatusLogAt: "2026-01-25T00:00:00Z",
           latestNoteAt: "2026-02-28T12:00:00Z",
+          latestInterviewAt: "2026-02-28T12:00:00Z",
+          columnName: "Applied",
+          columnType: null,
+        },
+        now
+      )
+    ).toBe("warning");
+  });
+
+  it("Saved column also ignores notes/interviews", () => {
+    expect(
+      getStalenessLevel(
+        {
+          createdAt: "2026-01-01T00:00:00Z",
+          latestStatusLogAt: "2026-01-25T00:00:00Z",
+          latestNoteAt: "2026-02-28T12:00:00Z",
+          columnName: "Saved",
+          columnType: null,
+        },
+        now
+      )
+    ).toBe("warning");
+  });
+
+  it("custom user-named columns ignore notes/interviews (Applied semantics)", () => {
+    expect(
+      getStalenessLevel(
+        {
+          createdAt: "2026-01-01T00:00:00Z",
+          latestStatusLogAt: "2026-01-25T00:00:00Z",
+          latestNoteAt: "2026-02-28T12:00:00Z",
+          columnName: "Follow-Up",
+          columnType: null,
+        },
+        now
+      )
+    ).toBe("warning");
+  });
+
+  it("Screening column refreshes staleness when a note arrives", () => {
+    // 35 days in stage but a note 1 day ago — still fresh.
+    expect(
+      getStalenessLevel(
+        {
+          createdAt: "2026-01-01T00:00:00Z",
+          latestStatusLogAt: "2026-01-25T00:00:00Z",
+          latestNoteAt: "2026-02-28T12:00:00Z",
+          columnName: "Screening",
           columnType: null,
         },
         now
       )
     ).toBe("none");
   });
-});
 
-describe("getLastActivity", () => {
-  it("picks the latest date from all sources", () => {
-    const result = getLastActivity({
-      updatedAt: "2026-01-01T00:00:00Z",
-      latestStatusLogAt: "2026-02-01T00:00:00Z",
-      latestInterviewAt: "2026-03-01T00:00:00Z",
-      latestNoteAt: "2026-02-15T00:00:00Z",
-    });
-    expect(result.toISOString()).toBe("2026-03-01T00:00:00.000Z");
+  it("Interview column refreshes staleness when an interview is logged", () => {
+    expect(
+      getStalenessLevel(
+        {
+          createdAt: "2026-01-01T00:00:00Z",
+          latestStatusLogAt: "2026-01-25T00:00:00Z",
+          latestInterviewAt: "2026-02-25T12:00:00Z",
+          columnName: "Interview",
+          columnType: null,
+        },
+        now
+      )
+    ).toBe("none");
   });
 
-  it("handles null activity sources", () => {
-    const result = getLastActivity({
-      updatedAt: "2026-02-01T00:00:00Z",
-      latestStatusLogAt: null,
-      latestInterviewAt: null,
-      latestNoteAt: null,
-    });
-    expect(result.toISOString()).toBe("2026-02-01T00:00:00.000Z");
+  it("Screening goes muted when notes/interviews also age past 14 days", () => {
+    expect(
+      getStalenessLevel(
+        {
+          createdAt: "2026-01-01T00:00:00Z",
+          latestStatusLogAt: "2026-01-15T00:00:00Z",
+          latestNoteAt: "2026-02-15T12:00:00Z",
+          columnName: "Screening",
+          columnType: null,
+        },
+        now
+      )
+    ).toBe("muted");
+  });
+
+  it("Screening goes warning when last engagement was 30+ days ago", () => {
+    expect(
+      getStalenessLevel(
+        {
+          createdAt: "2026-01-01T00:00:00Z",
+          latestStatusLogAt: "2026-01-15T00:00:00Z",
+          latestNoteAt: "2026-01-20T00:00:00Z",
+          latestInterviewAt: "2026-01-25T00:00:00Z",
+          columnName: "Screening",
+          columnType: null,
+        },
+        now
+      )
+    ).toBe("warning");
   });
 });
 
